@@ -1,0 +1,69 @@
+# Monorepo Taskfile — run all commands from repo root
+# Install: https://taskfile.dev/installation
+# Usage: task <task>  e.g. task backend:up
+
+version: "3"
+
+# Backend loads .env from root via pydantic-settings (../.env)
+# Create .env first: task env:create
+
+vars:
+  BACKEND_DIR: backend-app
+
+tasks:
+  # ── Env ──
+  env:create:
+    desc: Create .env from .env.example (run this first)
+    cmds:
+      - |
+        if [ -f .env ]; then
+          echo ".env already exists"
+        else
+          cp .env.example .env
+          echo "Created .env — edit it with your values"
+        fi
+
+  # ── Backend ──
+  backend:install:
+    desc: Install backend Python deps (Poetry)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry install
+
+  backend:migrate:
+    desc: Run Postgres migrations (alembic upgrade head)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry run alembic upgrade head
+
+  backend:revision:
+    desc: "Create new migration"
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry run alembic revision --autogenerate -m update
+
+  backend:up:
+    desc: Migrate + start uvicorn (full backend startup)
+    dir: "{{.BACKEND_DIR}}"
+    deps:
+      - backend:migrate
+    cmds:
+      - poetry run uvicorn main:app --reload
+
+  backend:test:
+    desc: Run backend tests
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry run pytest -v
+
+  backend:lint:
+    desc: Lint backend (ruff)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry run ruff check app
+
+  backend:format:
+    desc: Format backend (ruff)
+    dir: "{{.BACKEND_DIR}}"
+    cmds:
+      - poetry run ruff format app
