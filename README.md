@@ -20,6 +20,13 @@ Monorepo: FastAPI backend + React TypeScript frontend. All commands run from the
    ```
    API: http://localhost:8000
 
+5. **Frontend (optional)**
+   ```bash
+   task frontend:install
+   task frontend:run
+   ```
+   Dev server: http://localhost:5173. Add `http://localhost:5173` to `CORS_ORIGINS` in `.env` for local dev.
+
 ## Task commands (run from root)
 
 | Task | Description |
@@ -34,6 +41,9 @@ Monorepo: FastAPI backend + React TypeScript frontend. All commands run from the
 | `task backend:test` | Run tests |
 | `task backend:lint` | Lint (ruff) |
 | `task backend:format` | Format (ruff) |
+| `task frontend:install` | Install frontend deps (npm) |
+| `task frontend:run` | Start Vite dev server |
+| `task frontend:generate-client` | Generate API client from OpenAPI (requires backend) |
 
 ## Project layout
 

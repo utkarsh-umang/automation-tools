@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # ── App ──
     ENVIRONMENT: str = "local"
     SECRET_KEY: str = "change-me-in-production"
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5174"]
     API_V1_STR: str = "/api/v1"
 
     # ── Postgres ──

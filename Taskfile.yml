@@ -9,6 +9,7 @@ version: "3"
 
 vars:
   BACKEND_DIR: backend-app
+  FRONTEND_DIR: frontend
 
 tasks:
   # ── Dev (Docker infra) ──
@@ -78,3 +79,22 @@ tasks:
     dir: "{{.BACKEND_DIR}}"
     cmds:
       - poetry run ruff format app
+
+  # ── Frontend ──
+  frontend:install:
+    desc: Install frontend deps (npm)
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm install
+
+  frontend:run:
+    desc: Start Vite dev server
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run dev
+
+  frontend:generate-client:
+    desc: Generate API client from OpenAPI (requires backend running)
+    dir: "{{.FRONTEND_DIR}}"
+    cmds:
+      - npm run generate-client
