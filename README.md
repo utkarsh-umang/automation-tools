@@ -5,28 +5,32 @@ Monorepo: FastAPI backend + React TypeScript frontend. All commands run from the
 ## Quick start
 
 1. **Install Task** (if needed): https://taskfile.dev/installation
+2. **Install Docker** (for Postgres, MongoDB, Redis)
 
-2. **Create `.env`**
+3. **Create `.env`**
    ```bash
    task env:create
    ```
-   Then edit `.env` with your Postgres, MongoDB, Redis values.
+   Edit `.env` if needed (defaults work with Docker infra).
 
-3. **Start backend**
+4. **Start infra + backend**
    ```bash
-   task backend:up
+   task dev:infra    # Start Postgres, MongoDB, Redis (Docker)
+   task backend:up   # Migrate + start uvicorn
    ```
-   Runs migrations, then starts uvicorn. API: http://localhost:8000
+   API: http://localhost:8000
 
 ## Task commands (run from root)
 
 | Task | Description |
 |------|-------------|
+| `task dev:infra` | Start Postgres, MongoDB, Redis (Docker) |
+| `task dev:down` | Stop Docker infra |
 | `task env:create` | Create `.env` from `.env.example` |
 | `task backend:install` | Install Python deps (Poetry) |
 | `task backend:up` | Migrate + start uvicorn |
 | `task backend:migrate` | Run Postgres migrations |
-| `task backend:revision MESSAGE=add_users` | Create new Alembic migration |
+| `task backend:revision` | Create new Alembic migration |
 | `task backend:test` | Run tests |
 | `task backend:lint` | Lint (ruff) |
 | `task backend:format` | Format (ruff) |
@@ -35,9 +39,16 @@ Monorepo: FastAPI backend + React TypeScript frontend. All commands run from the
 
 ```
 .
-├── .env              # Your secrets (create from .env.example)
-├── .env.example      # Env template
-├── Taskfile.yml      # Root task runner
-├── backend-app/      # FastAPI backend
-└── frontend/         # React frontend
+├── .env                 # Your secrets (create from .env.example)
+├── .env.example         # Env template
+├── Taskfile.yml         # Root task runner
+├── docker-compose.yml   # Local infra (Postgres, MongoDB, Redis)
+├── backend-app/         # FastAPI backend
+└── frontend/            # React frontend
 ```
+
+## Local dev flow
+
+- **Infra:** Docker (Postgres, MongoDB, Redis) — `task dev:infra`
+- **App:** uvicorn on host (hot reload) — `task backend:up`
+- **Prod:** Everything containerized (app + infra)

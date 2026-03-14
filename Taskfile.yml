@@ -11,6 +11,17 @@ vars:
   BACKEND_DIR: backend-app
 
 tasks:
+  # ── Dev (Docker infra) ──
+  dev:infra:
+    desc: Start Postgres, MongoDB, Redis (Docker)
+    cmds:
+      - docker compose up -d
+
+  dev:down:
+    desc: Stop Docker infra
+    cmds:
+      - docker compose down
+
   # ── Env ──
   env:create:
     desc: Create .env from .env.example (run this first)
