@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_PASSWORD: str | None = None
 
+    # ── Auth ──
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+
     # ── GCP (optional) ──
     GCP_PROJECT_ID: str | None = None
     GCP_SECRET_NAME: str | None = None

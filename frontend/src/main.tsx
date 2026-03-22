@@ -6,6 +6,7 @@ import { OpenAPI } from '@/client'
 import { apiBaseUrl } from '@/config/api'
 import { App } from './App'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { AuthProvider } from './context/AuthContext'
 import './index.css'
 
 OpenAPI.BASE = apiBaseUrl
@@ -24,7 +25,9 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary>
         <BrowserRouter>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>
     </QueryClientProvider>
