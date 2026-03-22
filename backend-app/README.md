@@ -57,7 +57,7 @@ The app loads config from the **repo root `.env`** (or `backend-app/local.env` a
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `POSTGRES_HOST` | `localhost` | Postgres host. Use service name in Docker prod (e.g. `postgres`). |
-| `POSTGRES_PORT` | `5432` | Postgres port. |
+| `POSTGRES_PORT` | `54332` | Host port for local Docker (`54332:5432` in compose). |
 | `POSTGRES_USER` | `postgres` | Database user. Must match `docker-compose` for local dev. |
 | `POSTGRES_PASSWORD` | `postgres` | Database password. **Change in production.** |
 | `POSTGRES_DB` | `myapp` | Database name. Must match `docker-compose` for local dev. |
