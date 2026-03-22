@@ -11,3 +11,5 @@ async def test_health_returns_ok(client: AsyncClient) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
+    assert body["celery"] in ("connected", "no_workers", "unreachable")
+    assert body["flower"] in ("connected", "unreachable")

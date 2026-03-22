@@ -14,7 +14,7 @@ vars:
 tasks:
   # ── Dev (Docker infra) ──
   dev:infra:
-    desc: Start Postgres, MongoDB, Redis (Docker)
+    desc: Start Postgres, MongoDB, Redis, Celery worker, Flower (Docker)
     cmds:
       - docker compose up -d
 
@@ -59,10 +59,11 @@ tasks:
       - poetry run alembic revision --autogenerate -m update
 
   backend:up:
-    desc: Migrate + start uvicorn (full backend startup)
+    desc: Docker infra + migrate + start uvicorn (full backend startup)
     dir: "{{.BACKEND_DIR}}"
     env: *backend_poetry_env
     deps:
+      - dev:infra
       - backend:migrate
     cmds:
       - poetry run uvicorn main:app --reload

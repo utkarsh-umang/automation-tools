@@ -11,5 +11,7 @@ export type HealthResponse = {
     postgres: string;
     mongo: string;
     redis: string;
+    celery: string;
+    flower: string;
 };
 

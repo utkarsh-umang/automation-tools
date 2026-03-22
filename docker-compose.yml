@@ -1,5 +1,5 @@
-# Local dev infrastructure — Postgres, MongoDB, Redis
-# Run: task dev:infra
+# Local dev infrastructure — Postgres, MongoDB, Redis, Celery worker, Flower
+# Run: task dev:infra  (also started by task backend:up)
 # Uses .env for credentials (must match backend config)
 
 services:
@@ -35,7 +35,8 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      # Host 6383 → container 6379 (other services use redis:6379 on the Docker network)
+      - "6383:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -43,6 +44,36 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  celery-worker:
+    build:
+      context: ./backend-app
+      dockerfile: Dockerfile.celery
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    env_file:
+      - .env
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  flower:
+    image: mher/flower:2.0
+    restart: unless-stopped
+    # Must match Redis auth used by celery-worker; if REDIS_PASSWORD is set, use e.g.
+    # redis://:${REDIS_PASSWORD}@redis:6379/0 (and ensure special chars are URL-safe).
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/0
+      FLOWER_PORT: "5555"
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery-worker:
+        condition: service_started
 
 volumes:
   postgres_data:

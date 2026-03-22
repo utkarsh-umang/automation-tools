@@ -76,8 +76,17 @@ The app loads config from the **repo root `.env`** (or `backend-app/local.env` a
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_HOST` | `localhost` | Redis host. Use service name in Docker (e.g. `redis`). |
-| `REDIS_PORT` | `6379` | Redis port. |
+| `REDIS_PORT` | `6383` | Redis port on the host (Docker maps `6383:6379`). |
 | `REDIS_PASSWORD` | _(none)_ | Redis password. Set in production if required. |
+
+### Celery & Flower
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| _(derived)_ | — | `CELERY_BROKER_URL` is built from Redis settings (`redis://…/0`) for broker and result backend. |
+| `FLOWER_URL` | `http://localhost:5555` | Base URL for Flower (Docker publishes port `5555`). Used by `/health` to check the Flower UI. |
+
+With `task dev:infra` or `task backend:up`, Docker runs a **Celery worker** and **[Flower](https://github.com/mher/flower)**. Flower is at http://localhost:5555. If you set `REDIS_PASSWORD`, update `docker-compose.yml` (or an override) so the `flower` service’s `CELERY_BROKER_URL` matches your broker URL.
 
 ### GCP (optional, prod only)
 
@@ -100,20 +109,20 @@ The app loads config from the **repo root `.env`** (or `backend-app/local.env` a
 
 1. Create `.env` at repo root: `task env:create`
 2. Edit `.env` if needed (defaults work with Docker)
-3. Start infra: `task dev:infra`
+3. Start infra: `task dev:infra` (or skip and use step 5 — `backend:up` starts Docker infra)
 4. Install deps: `task backend:install`
-5. Start backend: `task backend:up`
+5. Start backend: `task backend:up` (starts Docker infra including Postgres, MongoDB, Redis, Celery worker, Flower, then migrates and runs uvicorn)
 
 **Daily:**
 
 ```bash
-task dev:infra    # If not already running
-task backend:up
+task backend:up   # Brings up Docker infra + migrate + API (or run dev:infra first if you prefer)
 ```
 
 - API: http://localhost:8000  
 - Health: http://localhost:8000/health  
 - Docs: http://localhost:8000/docs  
+- Flower (Celery UI): http://localhost:5555  
 
 ---
 

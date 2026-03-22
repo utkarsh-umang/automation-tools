@@ -38,8 +38,11 @@ class Settings(BaseSettings):
 
     # ── Redis ──
     REDIS_HOST: str = "localhost"
-    REDIS_PORT: int = 6379
+    REDIS_PORT: int = 6383
     REDIS_PASSWORD: str | None = None
+
+    # ── Celery / Flower (Flower UI for local dev; health checks this URL) ──
+    FLOWER_URL: str = "http://localhost:5555"
 
     # ── Auth ──
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
@@ -54,6 +57,13 @@ class Settings(BaseSettings):
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
+
+    @property
+    def CELERY_BROKER_URL(self) -> str:
+        """Redis URL for Celery broker and result backend."""
+        if self.REDIS_PASSWORD:
+            return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

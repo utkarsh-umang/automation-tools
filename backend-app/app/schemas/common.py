@@ -44,3 +44,5 @@ class HealthResponse(BaseModel):
     postgres: str
     mongo: str
     redis: str
+    celery: str
+    flower: str
