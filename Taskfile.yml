@@ -39,24 +39,29 @@ tasks:
   backend:install:
     desc: Install backend Python deps (Poetry)
     dir: "{{.BACKEND_DIR}}"
+    env: &backend_poetry_env
+      POETRY_VIRTUALENVS_IN_PROJECT: "true"
     cmds:
       - poetry install
 
   backend:migrate:
     desc: Run Postgres migrations (alembic upgrade head)
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     cmds:
       - poetry run alembic upgrade head
 
   backend:revision:
     desc: "Create new migration"
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     cmds:
       - poetry run alembic revision --autogenerate -m update
 
   backend:up:
     desc: Migrate + start uvicorn (full backend startup)
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     deps:
       - backend:migrate
     cmds:
@@ -65,18 +70,21 @@ tasks:
   backend:test:
     desc: Run backend tests
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     cmds:
       - poetry run pytest -v
 
   backend:lint:
     desc: Lint backend (ruff)
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     cmds:
       - poetry run ruff check app
 
   backend:format:
     desc: Format backend (ruff)
     dir: "{{.BACKEND_DIR}}"
+    env: *backend_poetry_env
     cmds:
       - poetry run ruff format app
 

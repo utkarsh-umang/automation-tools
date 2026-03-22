@@ -1,0 +1,4 @@
+# Keep the virtualenv inside this repo (not Poetry’s global cache or another project’s env).
+# Safe when the app was copied from another template that used the same Poetry project name.
+[virtualenvs]
+in-project = true
