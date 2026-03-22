@@ -8,6 +8,7 @@ interface AuthContextValue {
   user: AuthUser | null
   token: string | null
   isAuthenticated: boolean
+  isInitialized: boolean
   login: (token: string, user?: AuthUser) => void
   logout: () => void
 }
@@ -21,14 +22,16 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setTokenState] = useState<string | null>(null)
   const [user, setUser] = useState<AuthUser | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Restore session from localStorage on mount
+  // Restore session from localStorage on mount — must complete before
+  // ProtectedRoute evaluates isAuthenticated, otherwise a refresh causes
+  // an immediate redirect to /login before the token is read.
   useEffect(() => {
     const stored = getToken()
     if (stored) {
       OpenAPI.TOKEN = stored
       setTokenState(stored)
-      // User details are stored alongside the token
       try {
         const storedUser = localStorage.getItem('auth_user')
         if (storedUser) {
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         // ignore parse errors
       }
     }
+    setIsInitialized(true)
   }, [])
 
   const login = useCallback((newToken: string, newUser?: AuthUser) => {
@@ -64,6 +68,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         user,
         token,
         isAuthenticated: token !== null,
+        isInitialized,
         login,
         logout,
       }}

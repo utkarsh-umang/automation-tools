@@ -6,7 +6,7 @@ import { ToolNavIcon } from '@/components/layout/ToolNavIcon'
 export function Sidebar() {
   return (
     <aside
-      className="flex h-full w-[210px] shrink-0 flex-col border-r"
+      className="flex h-full w-64 shrink-0 flex-col border-r"
       style={{
         background: 'linear-gradient(180deg, #0a0f1e 0%, #0f1f4a 45%, #0a0f1e 100%)',
         borderColor: 'rgba(37,99,235,0.2)',
