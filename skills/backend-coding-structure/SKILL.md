@@ -34,9 +34,9 @@ backend-app/
 
 **Rule of thumb:** Spreadsheet → Postgres. JSON file → MongoDB.
 
-## Auth Contract
+## Auth
 
-`app/core/auth.py` defines `get_current_user`, `require_roles`, and `CurrentUser` as interfaces. They raise `NotImplementedError` by default. The consuming app **must** implement these before using auth-protected routes. Do not add auth logic to the template itself.
+Auth is **fully implemented**. `app/core/auth.py` exposes `get_current_user` (FastAPI dependency) and `require_roles(*roles)` (RBAC guard). See `skills/backend-api-design-auth/SKILL.md` for the full design, usage patterns, and checklist for adding new protected endpoints.
 
 ## Layering Rules
 
