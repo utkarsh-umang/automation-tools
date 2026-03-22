@@ -27,7 +27,7 @@ export function Login() {
           }
         : undefined
       login(data.access_token, user)
-      navigate('/', { replace: true })
+      navigate('/dashboard', { replace: true })
     },
     onError: (err: unknown) => {
       if (err instanceof ApiError) {
