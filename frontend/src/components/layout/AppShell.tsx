@@ -9,12 +9,17 @@ interface AppShellProps {
 
 export function AppShell({ children, breadcrumb }: AppShellProps) {
   return (
-    <div className="flex min-h-svh w-full flex-col" style={{ backgroundColor: '#0a0f1e' }}>
-      <div className="flex min-h-svh w-full flex-1">
+    <div
+      className="flex h-svh max-h-svh w-full flex-col overflow-hidden"
+      style={{ backgroundColor: '#0a0f1e' }}
+    >
+      <div className="flex min-h-0 w-full flex-1">
         <Sidebar />
-        <div className="flex min-h-svh min-w-0 flex-1 flex-col">
-          <AppHeader breadcrumb={breadcrumb} />
-          <div className="min-h-0 flex-1 overflow-auto" style={{ backgroundColor: '#f9fafb' }}>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div className="shrink-0">
+            <AppHeader breadcrumb={breadcrumb} />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto" style={{ backgroundColor: '#f9fafb' }}>
             {children}
           </div>
         </div>

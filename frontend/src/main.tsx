@@ -26,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
       <ErrorBoundary>
         <BrowserRouter>
           <AuthProvider>
-            <App />
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <App />
+            </div>
           </AuthProvider>
         </BrowserRouter>
       </ErrorBoundary>

@@ -45,7 +45,7 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen" style={{ backgroundColor: '#0a0f1e' }}>
+    <div className="flex min-h-0 w-full flex-1 overflow-y-auto" style={{ backgroundColor: '#0a0f1e' }}>
       {/* ── Left panel — brand ── */}
       <div
         className="relative hidden w-1/2 flex-col items-center justify-center overflow-hidden lg:flex"
