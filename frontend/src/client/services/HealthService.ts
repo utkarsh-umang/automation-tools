@@ -9,8 +9,8 @@ import { request as __request } from '../core/request';
 export class HealthService {
     /**
      * Health
-     * Health check with per-store connectivity status.
-     * Returns 200 with status for Postgres, MongoDB, and Redis.
+     * Health check with per-service connectivity status.
+     * Returns 200 with status for Postgres, MongoDB, Redis, Celery workers, and Flower.
      * @returns HealthResponse Successful Response
      * @throws ApiError
      */

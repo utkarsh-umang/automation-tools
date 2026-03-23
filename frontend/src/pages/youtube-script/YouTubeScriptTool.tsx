@@ -5,28 +5,54 @@ import { BatchCard } from '@/components/youtube-script/BatchCard'
 import { CreateBatchForm } from '@/components/youtube-script/CreateBatchForm'
 import { DailyCreditMeter } from '@/components/youtube-script/DailyCreditMeter'
 import { DailyLockNotice } from '@/components/youtube-script/DailyLockNotice'
-import { useYouTubeScript } from '@/hooks/useYouTubeScript'
+import {
+  getApiErrorMessage,
+  useBatchesQuery,
+  useCreateBatchMutation,
+  useCreditsTodayQuery,
+  useTriggerBatchMutation,
+  type BatchItem,
+} from '@/hooks/api/useYoutubeApi'
 
 type Tab = 'list' | 'create'
 
 export function YouTubeScriptTool() {
   const navigate = useNavigate()
   const [tab, setTab] = useState<Tab>('list')
+  const batchesQuery = useBatchesQuery()
+  const creditsQuery = useCreditsTodayQuery(10_000)
+  const createMutation = useCreateBatchMutation()
+  const triggerMutation = useTriggerBatchMutation()
 
-  const {
-    batches,
-    addBatch,
-    dailyCreditsUsed,
-    creditsRemaining,
-    creditUsagePercent,
-    dailyCreditLimit,
-    isDailyLocked,
-    todaysBatchName,
-  } = useYouTubeScript()
+  const batches = batchesQuery.data ?? []
+  const credits = creditsQuery.data
+  const activeBatch = credits?.activeBatchId ? batches.find((b) => b._id === credits.activeBatchId) : null
 
   function handleCreated() {
     navigate('/youtube-script', { replace: true })
     setTab('list')
+  }
+
+  async function handleCreate(payload: { name: string; keyword: string; termsRaw: string }) {
+    await createMutation.mutateAsync({
+      name: payload.name,
+      keyword: payload.keyword,
+      terms: payload.termsRaw,
+      filters: {
+        minSubs: 0,
+        maxSubs: 1_000_000,
+        minUploadsLast30d: 1,
+        minAvgViews: 0,
+        excludeCountries: ['IN'],
+        region: 'US',
+      },
+    })
+  }
+
+  function canTrigger(batch: BatchItem): boolean {
+    if (batch.status !== 'queued' && batch.status !== 'paused') return false
+    if (!credits?.activeBatchId) return true
+    return credits.activeBatchId === batch._id
   }
 
   return (
@@ -86,22 +112,40 @@ export function YouTubeScriptTool() {
 
         {tab === 'list' && (
           <div className="space-y-4">
-            <DailyCreditMeter
-              dailyCreditsUsed={dailyCreditsUsed}
-              creditsRemaining={creditsRemaining}
-              creditUsagePercent={creditUsagePercent}
-              dailyCreditLimit={dailyCreditLimit}
-            />
+            {credits ? (
+              <DailyCreditMeter
+                dailyCreditsUsed={credits.used}
+                creditsRemaining={credits.remaining}
+                creditUsagePercent={credits.limit > 0 ? (credits.used / credits.limit) * 100 : 0}
+                dailyCreditLimit={credits.limit}
+              />
+            ) : (
+              <div className="rounded-xl border px-4 py-4 text-sm" style={{ borderColor: '#e5e7eb' }}>
+                {creditsQuery.isLoading ? 'Loading credits...' : 'Unable to load credits.'}
+              </div>
+            )}
 
-            {isDailyLocked && todaysBatchName && (
-              <DailyLockNotice batchName={todaysBatchName} />
+            {credits?.activeBatchId && activeBatch && (
+              <DailyLockNotice batchName={activeBatch.name} />
             )}
 
             <div>
               <h2 className="mb-3 text-sm font-semibold" style={{ color: '#111827' }}>
                 Active batches
               </h2>
-              {batches.length === 0 ? (
+              {batchesQuery.isLoading ? (
+                <div className="rounded-xl border px-5 py-10 text-center" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
+                  <p className="text-sm" style={{ color: '#6b7280' }}>
+                    Loading batches...
+                  </p>
+                </div>
+              ) : batchesQuery.isError ? (
+                <div className="rounded-xl border px-5 py-10 text-center" style={{ borderColor: '#fecdd3', backgroundColor: '#fff1f2' }}>
+                  <p className="text-sm" style={{ color: '#be123c' }}>
+                    {getApiErrorMessage(batchesQuery.error)}
+                  </p>
+                </div>
+              ) : batches.length === 0 ? (
                 <div
                   className="rounded-xl border px-5 py-10 text-center"
                   style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}
@@ -122,14 +166,22 @@ export function YouTubeScriptTool() {
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                   {batches.map((b) => (
                     <BatchCard
-                      key={b.id}
+                      key={b._id}
                       name={b.name}
                       keyword={b.keyword}
                       totalTerms={b.totalTerms}
                       processedTerms={b.processedTerms}
                       status={b.status}
                       createdAt={b.createdAt}
-                      onClick={() => navigate(`/youtube-script/batch/${b.id}`)}
+                      onClick={() => navigate(`/youtube-script/batch/${b._id}`)}
+                      onTrigger={
+                        canTrigger(b)
+                          ? () => {
+                              triggerMutation.mutate(b._id)
+                            }
+                          : undefined
+                      }
+                      isTriggering={triggerMutation.isPending && triggerMutation.variables === b._id}
                     />
                   ))}
                 </div>
@@ -142,9 +194,9 @@ export function YouTubeScriptTool() {
           <CreateBatchForm
             onCancel={() => setTab('list')}
             onCreated={handleCreated}
-            onSubmitBatch={(payload) => {
-              addBatch(payload)
-            }}
+            onSubmitBatch={handleCreate}
+            isSubmitting={createMutation.isPending}
+            errorMessage={createMutation.isError ? getApiErrorMessage(createMutation.error) : null}
           />
         )}
       </div>

@@ -7,6 +7,8 @@ export { CancelablePromise, CancelError } from './core/CancelablePromise';
 export { OpenAPI } from './core/OpenAPI';
 export type { OpenAPIConfig } from './core/OpenAPI';
 
+export type { BatchCreateRequest } from './models/BatchCreateRequest';
+export type { BatchFiltersCreate } from './models/BatchFiltersCreate';
 export type { HealthResponse } from './models/HealthResponse';
 export type { HTTPValidationError } from './models/HTTPValidationError';
 export type { Token } from './models/Token';
@@ -19,3 +21,6 @@ export type { ValidationError } from './models/ValidationError';
 export { AuthService } from './services/AuthService';
 export { HealthService } from './services/HealthService';
 export { UsersService } from './services/UsersService';
+export { YoutubeBatchesService } from './services/YoutubeBatchesService';
+export { YoutubeCreditsService } from './services/YoutubeCreditsService';
+export { YoutubeLeadsService } from './services/YoutubeLeadsService';

@@ -4,10 +4,18 @@ import { isValidSearchTermsFormat, parseQuotedTerms } from '@/utils/searchTerms'
 interface CreateBatchFormProps {
   onCancel: () => void
   onCreated: () => void
-  onSubmitBatch: (payload: { name: string; keyword: string; searchTerms: string[] }) => void
+  onSubmitBatch: (payload: { name: string; keyword: string; termsRaw: string }) => Promise<void>
+  isSubmitting?: boolean
+  errorMessage?: string | null
 }
 
-export function CreateBatchForm({ onCancel, onCreated, onSubmitBatch }: CreateBatchFormProps) {
+export function CreateBatchForm({
+  onCancel,
+  onCreated,
+  onSubmitBatch,
+  isSubmitting = false,
+  errorMessage = null,
+}: CreateBatchFormProps) {
   const [name, setName] = useState('')
   const [keyword, setKeyword] = useState('')
   const [termsRaw, setTermsRaw] = useState('')
@@ -28,17 +36,17 @@ export function CreateBatchForm({ onCancel, onCreated, onSubmitBatch }: CreateBa
     parsedTerms.length === 0 ||
     Boolean(termsError)
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const nErr = trimmedName.length === 0 ? 'Batch name is required.' : null
     const kErr = trimmedKeyword.length === 0 ? 'Keyword is required.' : null
     const tErr = termsRaw.trim().length === 0 ? 'Search terms are required.' : null
     if (nErr || kErr || tErr || !formatOk) return
 
-    onSubmitBatch({
+    await onSubmitBatch({
       name: trimmedName,
       keyword: trimmedKeyword,
-      searchTerms: parseQuotedTerms(termsRaw),
+      termsRaw: termsRaw.trim(),
     })
     onCreated()
   }
@@ -69,6 +77,19 @@ export function CreateBatchForm({ onCancel, onCreated, onSubmitBatch }: CreateBa
       </div>
 
       <div className="space-y-5 px-5 py-5">
+        {errorMessage && (
+          <div
+            className="rounded-lg border px-3 py-2.5 text-sm"
+            style={{
+              backgroundColor: '#fff1f2',
+              borderColor: '#fecdd3',
+              color: '#be123c',
+            }}
+          >
+            {errorMessage}
+          </div>
+        )}
+
         <div
           className="rounded-lg border px-3 py-2.5 text-sm"
           style={{
@@ -228,6 +249,7 @@ export function CreateBatchForm({ onCancel, onCreated, onSubmitBatch }: CreateBa
         <button
           type="button"
           onClick={onCancel}
+          disabled={isSubmitting}
           className="rounded-lg px-4 py-2 text-sm font-medium"
           style={{
             border: '1px solid #e5e7eb',
@@ -239,14 +261,14 @@ export function CreateBatchForm({ onCancel, onCreated, onSubmitBatch }: CreateBa
         </button>
         <button
           type="submit"
-          disabled={submitDisabled}
+          disabled={submitDisabled || isSubmitting}
           className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
             boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
           }}
         >
-          Create Batch
+          {isSubmitting ? 'Creating...' : 'Create Batch'}
         </button>
       </div>
     </form>

@@ -1,4 +1,4 @@
-import type { BatchStatus } from '@/types/batch'
+type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed'
 
 interface BatchCardProps {
   name: string
@@ -8,6 +8,8 @@ interface BatchCardProps {
   status: BatchStatus
   createdAt: string
   onClick: () => void
+  onTrigger?: () => void
+  isTriggering?: boolean
 }
 
 function StatusBadge({ status }: { status: BatchStatus }) {
@@ -39,6 +41,12 @@ function StatusBadge({ status }: { status: BatchStatus }) {
       border: '#e5e7eb',
       color: '#6b7280',
     },
+    failed: {
+      label: 'Failed',
+      bg: '#fff1f2',
+      border: '#fecdd3',
+      color: '#be123c',
+    },
   }
   const s = map[status]
   return (
@@ -59,6 +67,8 @@ export function BatchCard({
   status,
   createdAt,
   onClick,
+  onTrigger,
+  isTriggering = false,
 }: BatchCardProps) {
   const pct = totalTerms > 0 ? Math.round((processedTerms / totalTerms) * 100) : 0
 
@@ -124,6 +134,22 @@ export function BatchCard({
               }}
             />
           </div>
+          {onTrigger && (
+            <div className="mt-3 flex justify-end">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onTrigger()
+                }}
+                disabled={isTriggering}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
+              >
+                {isTriggering ? 'Triggering...' : 'Trigger batch'}
+              </button>
+            </div>
+          )}
         </>
       )}
     </button>

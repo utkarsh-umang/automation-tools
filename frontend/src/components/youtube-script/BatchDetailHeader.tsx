@@ -1,4 +1,4 @@
-import type { Batch, BatchStatus } from '@/types/batch'
+import type { BatchDetail, BatchStatus } from '@/hooks/api/useYoutubeApi'
 
 function StatusBadge({ status }: { status: BatchStatus }) {
   const map: Record<BatchStatus, { label: string; bg: string; border: string; color: string }> = {
@@ -6,6 +6,7 @@ function StatusBadge({ status }: { status: BatchStatus }) {
     paused: { label: 'Paused', bg: '#fffbeb', border: '#fcd34d', color: '#b45309' },
     completed: { label: 'Completed', bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' },
     queued: { label: 'Queued', bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' },
+    failed: { label: 'Failed', bg: '#fff1f2', border: '#fecdd3', color: '#be123c' },
   }
   const s = map[status]
   return (
@@ -19,7 +20,7 @@ function StatusBadge({ status }: { status: BatchStatus }) {
 }
 
 interface BatchDetailHeaderProps {
-  batch: Batch
+  batch: BatchDetail
   onBack: () => void
 }
 

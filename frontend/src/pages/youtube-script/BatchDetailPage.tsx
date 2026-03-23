@@ -1,18 +1,61 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { BatchDetailHeader } from '@/components/youtube-script/BatchDetailHeader'
-import { useYouTubeScript } from '@/hooks/useYouTubeScript'
+import {
+  getApiErrorMessage,
+  useBatchDetailQuery,
+  useBatchLeadsQuery,
+  useCreditsTodayQuery,
+  useTriggerBatchMutation,
+} from '@/hooks/api/useYoutubeApi'
 
 export function BatchDetailPage() {
   const { batchId } = useParams<{ batchId: string }>()
   const navigate = useNavigate()
-  const { batches } = useYouTubeScript()
-
-  const batch = useMemo(() => batches.find((b) => b.id === batchId), [batches, batchId])
+  const [page, setPage] = useState(1)
+  const pageSize = 20
+  const detailQuery = useBatchDetailQuery(batchId, 10_000)
+  const creditsQuery = useCreditsTodayQuery(10_000)
+  const triggerMutation = useTriggerBatchMutation()
+  const shouldPollLeads = detailQuery.data?.status === 'running' || detailQuery.data?.status === 'paused'
+  const leadsQuery = useBatchLeadsQuery(batchId, page, pageSize, shouldPollLeads ? 10_000 : 0)
+  const batch = detailQuery.data
 
   function goBack() {
     navigate('/youtube-script')
+  }
+
+  if (detailQuery.isLoading) {
+    return (
+      <AppShell breadcrumb="YouTube Script">
+        <div className="mx-auto max-w-7xl px-6 py-10">
+          <p className="text-sm" style={{ color: '#6b7280' }}>
+            Loading batch...
+          </p>
+        </div>
+      </AppShell>
+    )
+  }
+
+  if (detailQuery.isError) {
+    return (
+      <AppShell breadcrumb="YouTube Script">
+        <div className="mx-auto max-w-7xl px-6 py-10">
+          <p className="text-sm" style={{ color: '#be123c' }}>
+            {getApiErrorMessage(detailQuery.error)}
+          </p>
+          <button
+            type="button"
+            onClick={goBack}
+            className="mt-4 text-sm font-medium"
+            style={{ color: '#2563eb' }}
+          >
+            ← Back to batches
+          </button>
+        </div>
+      </AppShell>
+    )
   }
 
   if (!batch) {
@@ -38,6 +81,11 @@ export function BatchDetailPage() {
   const remaining = Math.max(0, batch.totalTerms - batch.processedTerms)
   const pct = batch.totalTerms > 0 ? Math.round((batch.processedTerms / batch.totalTerms) * 100) : 0
   const estDays = Math.ceil(remaining / 100)
+  const terms = batch.terms ?? []
+  const leadsData = leadsQuery.data
+  const canTrigger = batch.status === 'queued' || batch.status === 'paused'
+  const blockedByOtherBatch =
+    Boolean(creditsQuery.data?.activeBatchId) && creditsQuery.data?.activeBatchId !== batch._id
 
   if (batch.status === 'paused') {
     return (
@@ -64,6 +112,18 @@ export function BatchDetailPage() {
               processing the remaining <strong>{remaining}</strong> terms.
             </p>
           </div>
+
+          {canTrigger && !blockedByOtherBatch && (
+            <button
+              type="button"
+              onClick={() => triggerMutation.mutate(batch._id)}
+              disabled={triggerMutation.isPending}
+              className="mb-4 rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}
+            >
+              {triggerMutation.isPending ? 'Triggering...' : 'Trigger batch'}
+            </button>
+          )}
 
           <div
             className="grid grid-cols-1 gap-3 rounded-xl border p-4 sm:grid-cols-3"
@@ -126,8 +186,11 @@ export function BatchDetailPage() {
             style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}
           >
             <Stat label="Terms processed" value={String(batch.processedTerms)} />
-            <Stat label="Channels found" value={String(batch.channelsFound ?? '—')} />
-            <Stat label="Emails extracted" value={String(batch.emailsExtracted ?? '—')} />
+            <Stat label="Channels found" value={String(leadsData?.total ?? '—')} />
+            <Stat
+              label="Emails extracted"
+              value={String(leadsData?.leads.filter((l) => l.emailStatus === 'found').length ?? '—')}
+            />
           </div>
 
           <div
@@ -190,7 +253,7 @@ export function BatchDetailPage() {
   }
 
   // running (in progress)
-  const rows = batch.termRows ?? []
+  const rows = terms
 
   return (
     <AppShell breadcrumb="YouTube Script">
@@ -244,7 +307,7 @@ export function BatchDetailPage() {
           <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
             {rows.map((row, i) => (
               <div key={`${i}-${row.term}`} className="grid grid-cols-12 gap-2 px-4 py-3 text-sm">
-                <div className="col-span-5 break-words" style={{ color: '#111827' }}>
+                <div className="col-span-5 wrap-break-word" style={{ color: '#111827' }}>
                   {row.term}
                 </div>
                 <div className="col-span-3 tabular-nums" style={{ color: '#6b7280' }}>
@@ -257,6 +320,75 @@ export function BatchDetailPage() {
             ))}
           </div>
         </div>
+
+        <div className="mt-6 overflow-hidden rounded-xl border" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
+          <div
+            className="grid grid-cols-12 gap-2 border-b px-4 py-3 text-xs font-semibold uppercase tracking-wide"
+            style={{ borderColor: '#e5e7eb', color: '#6b7280' }}
+          >
+            <div className="col-span-5">Channel</div>
+            <div className="col-span-3">Email</div>
+            <div className="col-span-2">Score</div>
+            <div className="col-span-2">Status</div>
+          </div>
+          {leadsQuery.isLoading ? (
+            <p className="px-4 py-4 text-sm" style={{ color: '#6b7280' }}>
+              Loading leads...
+            </p>
+          ) : leadsQuery.isError ? (
+            <p className="px-4 py-4 text-sm" style={{ color: '#be123c' }}>
+              {getApiErrorMessage(leadsQuery.error)}
+            </p>
+          ) : !leadsData || leadsData.leads.length === 0 ? (
+            <p className="px-4 py-4 text-sm" style={{ color: '#6b7280' }}>
+              No leads yet.
+            </p>
+          ) : (
+            <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
+              {leadsData.leads.map((lead) => (
+                <div key={lead._id} className="grid grid-cols-12 gap-2 px-4 py-3 text-sm">
+                  <div className="col-span-5 truncate" style={{ color: '#111827' }}>
+                    {lead.channelName ?? '—'}
+                  </div>
+                  <div className="col-span-3 truncate" style={{ color: '#6b7280' }}>
+                    {lead.email ?? '—'}
+                  </div>
+                  <div className="col-span-2 tabular-nums" style={{ color: '#6b7280' }}>
+                    {lead.score ?? '—'}
+                  </div>
+                  <div className="col-span-2" style={{ color: '#6b7280' }}>
+                    {lead.emailStatus ?? 'unknown'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        {leadsData && leadsData.total > pageSize && (
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+              style={{ borderColor: '#e5e7eb' }}
+            >
+              Prev
+            </button>
+            <span className="text-sm" style={{ color: '#6b7280' }}>
+              Page {page}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page * pageSize >= leadsData.total}
+              className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
+              style={{ borderColor: '#e5e7eb' }}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
     </AppShell>
   )
@@ -275,7 +407,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-function RowStatus({ status }: { status: 'done' | 'running' | 'pending' }) {
+function RowStatus({ status }: { status: 'done' | 'running' | 'pending' | 'failed' }) {
   if (status === 'done') {
     return (
       <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: '#f0fdf4', color: '#15803d' }}>
@@ -287,6 +419,13 @@ function RowStatus({ status }: { status: 'done' | 'running' | 'pending' }) {
     return (
       <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: 'rgba(37,99,235,0.1)', color: '#1d4ed8' }}>
         Running
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" style={{ background: '#fff1f2', color: '#be123c' }}>
+        Failed
       </span>
     )
   }
