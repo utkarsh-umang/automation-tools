@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import logo from '@/assets/logo.png'
 import { useAuth } from '@/hooks/useAuth'
 
 interface AppHeaderProps {
@@ -26,14 +25,9 @@ export function AppHeader({ breadcrumb }: AppHeaderProps) {
     >
       <div className="flex items-center justify-between px-6 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          <img src={logo} alt="" className="h-9 w-9 shrink-0 rounded-lg" />
-          <span className="truncate text-sm font-semibold" style={{ color: '#ffffff' }}>
-            Scale Brands Lab
-          </span>
-          <div className="hidden h-4 w-px shrink-0 sm:block" style={{ backgroundColor: 'rgba(37,99,235,0.4)' }} />
           <span
-            className="hidden truncate text-xs sm:block"
-            style={{ color: 'rgba(255,255,255,0.35)' }}
+            className="hidden truncate text-xm sm:block"
+            style={{ color: 'rgba(255,255,255,0.65)' }}
           >
             {breadcrumb ?? 'Tools'}
           </span>

@@ -9,6 +9,7 @@ export interface SearchTermItem {
   term: string
   status: TermStatus
   creditsUsed?: number
+  emailsFound?: number
   errorMessage?: string | null
 }
 
@@ -38,6 +39,7 @@ export interface LeadItem {
   _id: string
   channelName?: string
   channelUrl?: string
+  subscribers?: number
   email?: string | null
   score?: number
   emailStatus?: string
