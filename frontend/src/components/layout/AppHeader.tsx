@@ -48,16 +48,6 @@ export function AppHeader({ breadcrumb }: AppHeaderProps) {
               <span className="hidden text-sm sm:block" style={{ color: 'rgba(255,255,255,0.65)' }}>
                 {user.email}
               </span>
-              <span
-                className="rounded px-1.5 py-0.5 text-xs font-semibold"
-                style={{
-                  background: 'rgba(37,99,235,0.25)',
-                  border: '1px solid rgba(37,99,235,0.5)',
-                  color: '#93c5fd',
-                }}
-              >
-                {user.role}
-              </span>
             </div>
           )}
           <button

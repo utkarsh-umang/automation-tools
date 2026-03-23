@@ -68,17 +68,19 @@ export function YouTubeScriptTool() {
               API quota and can span multiple days.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setTab('create')}
-            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white"
-            style={{
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
-            }}
-          >
-            + New Batch
-          </button>
+          {tab === 'list' && (
+            <button
+              type="button"
+              onClick={() => setTab('create')}
+              className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white"
+              style={{
+                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
+              }}
+            >
+              + New Batch
+            </button>
+          )}
         </div>
 
         <div className="mb-6 border-b" style={{ borderColor: '#e5e7eb' }}>

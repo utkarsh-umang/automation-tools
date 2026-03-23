@@ -90,18 +90,6 @@ export function CreateBatchForm({
           </div>
         )}
 
-        <div
-          className="rounded-lg border px-3 py-2.5 text-sm"
-          style={{
-            backgroundColor: '#eff6ff',
-            borderColor: 'rgba(37,99,235,0.25)',
-            color: '#1e3a8a',
-          }}
-        >
-          YouTube Data API quota is <strong>10,000 credits per day</strong> (~100 terms). Batches with more
-          than ~100 terms will continue across multiple days automatically.
-        </div>
-
         <div>
           <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
             Batch name <span style={{ color: '#be123c' }}>*</span>
@@ -184,7 +172,7 @@ export function CreateBatchForm({
           <textarea
             value={termsRaw}
             onChange={(e) => setTermsRaw(e.target.value)}
-            rows={5}
+            rows={2}
             className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
             style={{
               border: `1px solid ${termsError ? '#fecdd3' : '#e5e7eb'}`,
