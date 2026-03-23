@@ -90,73 +90,72 @@ export function CreateBatchForm({
           </div>
         )}
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
-            Batch name <span style={{ color: '#be123c' }}>*</span>
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
-            style={{
-              border: `1px solid ${name && trimmedName.length === 0 ? '#fecdd3' : '#e5e7eb'}`,
-              color: '#111827',
-              backgroundColor: '#f9fafb',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#2563eb'
-              e.target.style.backgroundColor = '#ffffff'
-              e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#e5e7eb'
-              e.target.style.backgroundColor = '#f9fafb'
-              e.target.style.boxShadow = 'none'
-            }}
-            placeholder="e.g. Q1 podcast outreach"
-          />
-          {name && trimmedName.length === 0 && (
-            <p className="mt-1 text-xs" style={{ color: '#be123c' }}>
-              Batch name is required.
-            </p>
-          )}
-        </div>
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-4">
+          <div className="min-w-0 flex-1">
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
+              Batch name <span style={{ color: '#be123c' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
+              style={{
+                border: `1px solid ${name && trimmedName.length === 0 ? '#fecdd3' : '#e5e7eb'}`,
+                color: '#111827',
+                backgroundColor: '#f9fafb',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#2563eb'
+                e.target.style.backgroundColor = '#ffffff'
+                e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e5e7eb'
+                e.target.style.backgroundColor = '#f9fafb'
+                e.target.style.boxShadow = 'none'
+              }}
+              placeholder="e.g. Q1 podcast outreach"
+            />
+            {name && trimmedName.length === 0 && (
+              <p className="mt-1 text-xs" style={{ color: '#be123c' }}>
+                Batch name is required.
+              </p>
+            )}
+          </div>
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
-            Keyword / category <span style={{ color: '#be123c' }}>*</span>
-          </label>
-          <p className="mb-1.5 text-xs" style={{ color: '#6b7280' }}>
-            This is a label for your batch only — it is not sent as a search filter to YouTube.
-          </p>
-          <input
-            type="text"
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
-            style={{
-              border: `1px solid ${keyword && trimmedKeyword.length === 0 ? '#fecdd3' : '#e5e7eb'}`,
-              color: '#111827',
-              backgroundColor: '#f9fafb',
-            }}
-            onFocus={(e) => {
-              e.target.style.borderColor = '#2563eb'
-              e.target.style.backgroundColor = '#ffffff'
-              e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = '#e5e7eb'
-              e.target.style.backgroundColor = '#f9fafb'
-              e.target.style.boxShadow = 'none'
-            }}
-            placeholder="e.g. Podcasts"
-          />
-          {keyword && trimmedKeyword.length === 0 && (
-            <p className="mt-1 text-xs" style={{ color: '#be123c' }}>
-              Keyword is required.
-            </p>
-          )}
+          <div className="min-w-0 flex-1">
+            <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
+              Keyword / category <span style={{ color: '#be123c' }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
+              style={{
+                border: `1px solid ${keyword && trimmedKeyword.length === 0 ? '#fecdd3' : '#e5e7eb'}`,
+                color: '#111827',
+                backgroundColor: '#f9fafb',
+              }}
+              onFocus={(e) => {
+                e.target.style.borderColor = '#2563eb'
+                e.target.style.backgroundColor = '#ffffff'
+                e.target.style.boxShadow = '0 0 0 3px rgba(37,99,235,0.12)'
+              }}
+              onBlur={(e) => {
+                e.target.style.borderColor = '#e5e7eb'
+                e.target.style.backgroundColor = '#f9fafb'
+                e.target.style.boxShadow = 'none'
+              }}
+              placeholder="e.g. Podcasts"
+            />
+            {keyword && trimmedKeyword.length === 0 && (
+              <p className="mt-1 text-xs" style={{ color: '#be123c' }}>
+                Keyword is required.
+              </p>
+            )}
+          </div>
         </div>
 
         <div>

@@ -14,7 +14,8 @@ Key behaviours:
 """
 
 import logging
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.cache.redis_client import get_raw_redis
 from app.celery_app import celery_app
@@ -32,6 +33,7 @@ from app.worker.youtube.credits import CreditCounter, CreditLimitExceeded
 logger = logging.getLogger(__name__)
 
 LOCK_TTL_SECONDS = 600  # 10 minutes
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 
 @celery_app.task(name="youtube.run_batch", bind=True)
@@ -55,7 +57,7 @@ def run_batch(self, batch_id: str) -> None:
 
 def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
     """Inner run logic (separated from the lock boilerplate for clarity)."""
-    today = date.today().isoformat()
+    today = datetime.now(PACIFIC_TZ).date().isoformat()
     credit_key = f"yt_credits:{today}"
 
     # ── Check batch is in a triggerable state ─────────────────────────

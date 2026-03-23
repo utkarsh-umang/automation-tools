@@ -1,16 +1,18 @@
 """Repository for yt_daily_usage collection."""
 
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from app.mongo.read import fetch_from_collection
 from app.mongo.update import update_document
 from app.mongo.upsert import upsert_document
 
 COLLECTION = "yt_daily_usage"
+PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 
 def _today() -> str:
-    return date.today().isoformat()
+    return datetime.now(PACIFIC_TZ).date().isoformat()
 
 
 def get_or_create_today() -> dict:
