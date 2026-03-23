@@ -140,6 +140,17 @@ export function useTriggerBatchMutation() {
   return useMutation({
     mutationFn: (batchId: string) =>
       YoutubeBatchesService.triggerBatchApiV1YoutubeBatchesBatchIdTriggerPost(batchId),
+    onMutate: (batchId) => {
+      qc.setQueryData<CreditsToday | undefined>(youtubeKeys.credits(), (prev) =>
+        prev ? { ...prev, activeBatchId: batchId } : prev,
+      )
+      qc.setQueryData<BatchItem[] | undefined>(youtubeKeys.batches(), (prev) =>
+        prev?.map((b) => (b._id === batchId ? { ...b, status: 'running' } : b)),
+      )
+      qc.setQueryData<BatchDetail | undefined>(youtubeKeys.batch(batchId), (prev) =>
+        prev ? { ...prev, status: 'running' } : prev,
+      )
+    },
     onSuccess: (_, batchId) => {
       void qc.invalidateQueries({ queryKey: youtubeKeys.batch(batchId) })
       void qc.invalidateQueries({ queryKey: youtubeKeys.batches() })

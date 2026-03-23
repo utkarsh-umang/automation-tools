@@ -127,8 +127,8 @@ export function YouTubeScriptTool() {
               </div>
             )}
 
-            {credits?.activeBatchId && activeBatch && (
-              <DailyLockNotice batchName={activeBatch.name} />
+            {credits?.activeBatchId && (
+              <DailyLockNotice batchName={activeBatch?.name ?? 'Another batch'} />
             )}
 
             <div>

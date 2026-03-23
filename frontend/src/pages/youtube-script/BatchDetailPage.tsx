@@ -203,7 +203,18 @@ export function BatchDetailPage() {
 }
 
 interface LeadsTableSectionProps {
-  leadsData: { leads: Array<{ _id: string; channelName?: string; email?: string | null; subscribers?: number; score?: number; emailStatus?: string }>; total: number } | undefined
+  leadsData: {
+    leads: Array<{
+      _id: string
+      channelName?: string
+      channelUrl?: string
+      email?: string | null
+      subscribers?: number
+      score?: number
+      emailStatus?: string
+    }>
+    total: number
+  } | undefined
   isLoading: boolean
   isError: boolean
   error: unknown
@@ -265,7 +276,19 @@ function LeadsTableSection({
             {rows.map((lead) => (
               <div key={lead._id} className="grid h-8 grid-cols-12 gap-2 px-4 text-sm items-center">
                 <div className="col-span-4 truncate" style={{ color: '#111827' }}>
-                  {lead.channelName ?? '—'}
+                  {lead.channelUrl ? (
+                    <a
+                      href={lead.channelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                      style={{ color: '#2563eb' }}
+                    >
+                      {lead.channelName ?? lead.channelUrl}
+                    </a>
+                  ) : (
+                    lead.channelName ?? '—'
+                  )}
                 </div>
                 <div className="col-span-3 truncate" style={{ color: '#6b7280' }}>
                   {lead.email ?? '—'}
