@@ -5,6 +5,7 @@ import json
 import logging
 from datetime import datetime
 from typing import Any
+
 import redis
 
 from app.core.config import config
@@ -95,3 +96,13 @@ class RedisCache:
 
 
 cache = RedisCache()
+
+
+def get_raw_redis() -> redis.Redis:
+    """Return a raw Redis client for direct operations (locks, INCRBY, etc.)."""
+    return redis.Redis(
+        host=config.REDIS_HOST,
+        port=config.REDIS_PORT,
+        password=config.REDIS_PASSWORD or None,
+        decode_responses=True,
+    )

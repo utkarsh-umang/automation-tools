@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # ── Auth ──
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
+    # ── YouTube ──
+    YOUTUBE_API_KEY_V3: str = ""
+    YOUTUBE_DAILY_CREDIT_LIMIT: int = 10000
+
     # ── GCP (optional) ──
     GCP_PROJECT_ID: str | None = None
     GCP_SECRET_NAME: str | None = None

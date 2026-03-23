@@ -24,6 +24,7 @@ pydantic = {extras = ["email"], version = "^2.12.5"}
 bcrypt = "<4"
 celery = "^5.6.2"
 httpx = "^0.28.1"
+requests = "^2.32.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
@@ -39,7 +40,7 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
-ignore = ["E501", "N802"]
+ignore = ["E501", "N802", "N815"]
 
 [build-system]
 requires = ["poetry-core"]

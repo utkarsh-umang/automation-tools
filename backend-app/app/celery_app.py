@@ -8,6 +8,10 @@ celery_app = Celery(
     "backend",
     broker=config.CELERY_BROKER_URL,
     backend=config.CELERY_BROKER_URL,
+    include=[
+        "app.worker.orchestrator",
+        "app.worker.process_term",
+    ],
 )
 
 celery_app.conf.update(
