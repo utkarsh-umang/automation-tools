@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     GCP_PROJECT_ID: str | None = None
     GCP_SECRET_NAME: str | None = None
 
+    # ── Google Sheets ──
+    GOOGLE_CREDENTIALS_FILE: str = "credentials.json"
+
     @property
     def DATABASE_URL(self) -> str:
         return (
