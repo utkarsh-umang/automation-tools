@@ -24,6 +24,7 @@ dist-ssr
 *.local
 openapi.json
 url-to-email-445616-cebe4868914f.json
+credentials.json
 
 # Editor directories and files
 .vscode/*

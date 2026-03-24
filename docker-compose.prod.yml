@@ -1,0 +1,130 @@
+# Production Docker Compose — all services in one stack
+# Usage:
+#   1. Copy .env.prod.example → .env  (fill in every value)
+#   2. Place your GCP service-account JSON at repo root as: credentials.json
+#   3. docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  # ── Databases ──────────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-myapp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "sh", "-c", "redis-cli -a $$REDIS_PASSWORD ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: always
+
+  # ── Backend ────────────────────────────────────────────────────────────────
+
+  backend:
+    build:
+      context: ./backend-app
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      # Override local-dev defaults with in-Docker service names/ports
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MONGO_LOCAL_URI: mongodb://mongo:27017
+      FLOWER_URL: http://flower:5555
+    env_file:
+      - .env
+    volumes:
+      # Mount GCP service-account key so GoogleSheetService can read it
+      - ./credentials.json:/app/credentials.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Celery worker ──────────────────────────────────────────────────────────
+
+  celery-worker:
+    build:
+      context: ./backend-app
+      dockerfile: Dockerfile.celery
+    restart: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MONGO_LOCAL_URI: mongodb://mongo:27017
+    env_file:
+      - .env
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+    depends_on:
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+
+  # ── Flower (Celery monitoring UI) ──────────────────────────────────────────
+
+  flower:
+    image: mher/flower:2.0
+    restart: always
+    environment:
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      FLOWER_PORT: "5555"
+      # Protect the UI — set FLOWER_BASIC_AUTH=user:password in .env
+      FLOWER_BASIC_AUTH: ${FLOWER_BASIC_AUTH:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+      celery-worker:
+        condition: service_started
+
+  # ── Frontend (nginx serves React SPA + proxies /api to backend) ────────────
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    restart: always
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
