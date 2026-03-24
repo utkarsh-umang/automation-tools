@@ -387,7 +387,7 @@ function ScoreTooltipIcon() {
         aria-label="Score details"
       />
       <div
-        className="pointer-events-none absolute right-0 top-full z-10 mt-2 w-[340px] rounded-lg border bg-white p-3 text-[11px] leading-relaxed shadow opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0"
+        className="pointer-events-none absolute right-0 top-full z-10 mt-2 w-85 rounded-lg border bg-white p-3 text-[11px] leading-relaxed shadow opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0"
         style={{ borderColor: '#dbeafe', color: '#1f2937' }}
       >
         <div className="mb-1 font-semibold" style={{ color: '#1e3a8a' }}>
