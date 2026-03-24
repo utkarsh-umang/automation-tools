@@ -170,3 +170,22 @@ export function useDeleteBatchMutation() {
     },
   })
 }
+
+export function useExportBatchMutation() {
+  return useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await fetch(`/api/v1/youtube/batches/${batchId}/export`)
+      if (!response.ok) throw new Error('Export failed')
+      const blob = await response.blob()
+      const disposition = response.headers.get('Content-Disposition') ?? ''
+      const match = disposition.match(/filename="([^"]+)"/)
+      const filename = match ? match[1] : `leads_${batchId}.csv`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    },
+  })
+}

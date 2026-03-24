@@ -6,6 +6,7 @@ import {
   useBatchDetailQuery,
   useBatchLeadsQuery,
   useCreditsTodayQuery,
+  useExportBatchMutation,
   useTriggerBatchMutation,
 } from '@/hooks/api/useYoutubeApi'
 import { CircleQuestionMark } from 'lucide-react'
@@ -18,6 +19,7 @@ export function BatchDetailPage() {
   const detailQuery = useBatchDetailQuery(batchId, 10_000)
   const creditsQuery = useCreditsTodayQuery(10_000)
   const triggerMutation = useTriggerBatchMutation()
+  const exportMutation = useExportBatchMutation()
   const shouldPollLeads = detailQuery.data?.status === 'running' || detailQuery.data?.status === 'paused'
   const leadsQuery = useBatchLeadsQuery(batchId, page, pageSize, shouldPollLeads ? 10_000 : 0)
   const batch = detailQuery.data
@@ -126,19 +128,28 @@ export function BatchDetailPage() {
               {batch.keyword} · {batch.totalTerms} terms
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled
-              title="CSV export is not available yet."
-              className="cursor-not-allowed rounded-lg px-3 py-1.5 text-xs font-semibold text-white opacity-60"
-              style={{
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
-              }}
-            >
-              Export CSV
-            </button>
+          <div className="flex flex-col items-end gap-1">
+            {exportMutation.isError && (
+              <p className="text-xs font-medium" style={{ color: '#be123c' }}>
+                {getApiErrorMessage(exportMutation.error)}
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+            {batch.status === 'completed' && (
+              <button
+                type="button"
+                onClick={() => exportMutation.mutate(batch._id)}
+                disabled={exportMutation.isPending}
+                title="Download all leads as CSV"
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
+                }}
+              >
+                {exportMutation.isPending ? 'Exporting...' : 'Export CSV'}
+              </button>
+            )}
             {canTrigger && !blockedByOtherBatch && (
               <button
                 type="button"
@@ -150,6 +161,7 @@ export function BatchDetailPage() {
                 {triggerMutation.isPending ? 'Triggering...' : 'Trigger'}
               </button>
             )}
+            </div>
           </div>
         </div>
 

@@ -15,26 +15,31 @@ COLUMN_LETTERS: dict[int, str] = {i: chr(ord("A") + i) for i in range(26)}
 logger = logging.getLogger(__name__)
 
 class GoogleSheetService:
-    """Service for interacting with Google Sheets API"""
-    
+    """Service for interacting with Google Sheets and Drive APIs"""
+
+    SCOPES = [
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive',
+    ]
+
     def __init__(self, credentials_file: str = config.GOOGLE_CREDENTIALS_FILE):
         """Initialize the Google Sheets service with credentials"""
         self.credentials_file = credentials_file
-        self.service = self._setup_service()
-        
+        self.service, self.drive_service = self._setup_service()
+
     def _setup_service(self):
-        """Set up and return Google Sheets service with error handling"""
+        """Set up and return Google Sheets + Drive services with error handling"""
         try:
-            scopes = ['https://www.googleapis.com/auth/spreadsheets']
             credentials = service_account.Credentials.from_service_account_file(
-                self.credentials_file, scopes=scopes)
-            service = build('sheets', 'v4', credentials=credentials)
-            return service
+                self.credentials_file, scopes=self.SCOPES)
+            sheets_service = build('sheets', 'v4', credentials=credentials)
+            drive_service = build('drive', 'v3', credentials=credentials)
+            return sheets_service, drive_service
         except FileNotFoundError:
             logger.error(f"Credentials file not found: {self.credentials_file}")
             raise
         except Exception as e:
-            logger.error(f"Failed to setup Google Sheets service: {str(e)}")
+            logger.error(f"Failed to setup Google services: {str(e)}")
             raise
 
     def extract_spreadsheet_id(self, url: str) -> str:
@@ -52,6 +57,103 @@ class GoogleSheetService:
         if match:
             return match.group(1)
         return url
+
+    def create_spreadsheet(self, title: str) -> Tuple[bool, Union[dict, str]]:
+        """
+        Create a new Google Spreadsheet owned by the service account.
+
+        Any existing Drive files with the same title are deleted first to free
+        up quota (previous exports accumulate otherwise).
+
+        Args:
+            title: Title for the new spreadsheet
+
+        Returns:
+            Tuple of (success, result) where result is a dict with
+            'spreadsheetId' and 'spreadsheetUrl', or an error message string.
+        """
+        try:
+            # Delete ALL export spreadsheets owned by the service account to free quota.
+            # This is a one-time cleanup; after ownership transfer below, future exports
+            # will live in the recipient's Drive and never accumulate here again.
+            page_token = None
+            while True:
+                resp = self.drive_service.files().list(
+                    q="name contains 'Export:' and mimeType='application/vnd.google-apps.spreadsheet' and trashed=false",
+                    fields='nextPageToken,files(id,name)',
+                    pageToken=page_token,
+                ).execute()
+                for f in resp.get('files', []):
+                    try:
+                        self.drive_service.files().delete(fileId=f['id']).execute()
+                        logger.info("Deleted old export file '%s' (%s)", f['name'], f['id'])
+                    except HttpError:
+                        pass  # Best-effort cleanup
+                page_token = resp.get('nextPageToken')
+                if not page_token:
+                    break
+
+            file_metadata = {
+                'name': title,
+                'mimeType': 'application/vnd.google-apps.spreadsheet'
+            }
+            result = self.drive_service.files().create(
+                body=file_metadata,
+                fields='id,webViewLink'
+            ).execute()
+            spreadsheet_id = result['id']
+            spreadsheet_url = result.get(
+                'webViewLink',
+                f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
+            )
+            return True, {
+                "spreadsheetId": spreadsheet_id,
+                "spreadsheetUrl": spreadsheet_url,
+            }
+        except HttpError as error:
+            error_message = f"Google Sheets API error: {str(error)}"
+            logger.error(error_message)
+            return False, error_message
+        except Exception as e:
+            error_message = f"Error creating spreadsheet: {str(e)}"
+            logger.error(error_message)
+            return False, error_message
+
+    def share_spreadsheet(
+        self, spreadsheet_id: str, email: str, role: str = "writer"
+    ) -> Tuple[bool, str]:
+        """
+        Share a spreadsheet with a user via the Drive API.
+
+        Args:
+            spreadsheet_id: The ID of the spreadsheet to share
+            email: Email address to share with
+            role: Permission role — 'writer' (default), 'reader', or 'owner'
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            permission_body = {
+                "type": "user",
+                "role": role,
+                "emailAddress": email,
+            }
+            self.drive_service.permissions().create(
+                fileId=spreadsheet_id,
+                body=permission_body,
+                transferOwnership=(role == "owner"),
+                sendNotificationEmail=False,
+            ).execute()
+            return True, f"Shared spreadsheet {spreadsheet_id} with {email} as {role}"
+        except HttpError as error:
+            error_message = f"Google Drive API error: {str(error)}"
+            logger.error(error_message)
+            return False, error_message
+        except Exception as e:
+            error_message = f"Error sharing spreadsheet: {str(e)}"
+            logger.error(error_message)
+            return False, error_message
 
     def list_sheets(self, spreadsheet_id: str) -> Tuple[bool, Union[List[str], str]]:
         """

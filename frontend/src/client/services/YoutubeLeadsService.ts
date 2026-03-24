@@ -37,14 +37,14 @@ export class YoutubeLeadsService {
     }
     /**
      * Export Leads
-     * CSV export — not yet implemented.
+     * Export all leads for a batch to a new Google Sheet and return its URL.
      * @param batchId
      * @returns any Successful Response
      * @throws ApiError
      */
     public static exportLeadsApiV1YoutubeBatchesBatchIdExportGet(
         batchId: string,
-    ): CancelablePromise<any> {
+    ): CancelablePromise<Record<string, any>> {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/youtube/batches/{batch_id}/export',

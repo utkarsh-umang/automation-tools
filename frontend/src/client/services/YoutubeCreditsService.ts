@@ -11,7 +11,7 @@ export class YoutubeCreditsService {
      * Return today's YouTube API credit usage.
      *
      * Returns a zeroed response (not 404) if no usage has been recorded yet.
-     * resetAt is midnight UTC of the following day.
+     * resetAt is midnight Pacific Time of the following day.
      * @returns any Successful Response
      * @throws ApiError
      */

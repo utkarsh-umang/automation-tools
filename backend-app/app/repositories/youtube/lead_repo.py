@@ -40,5 +40,17 @@ def paginated_list(
     return leads, total
 
 
+def get_all_for_batch(batch_id: str) -> list[dict]:
+    """Return all leads for a batch sorted by score descending (no pagination)."""
+    result = fetch_from_collection_with_options(
+        COLLECTION,
+        query={"batchId": batch_id},
+        sort=[("score", -1)],
+        skip=0,
+        limit=None,
+    )
+    return result.data if result.success else []
+
+
 def delete_for_batch(batch_id: str) -> None:
     delete_multiple_documents(COLLECTION, {"batchId": batch_id})
