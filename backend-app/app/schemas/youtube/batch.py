@@ -11,6 +11,7 @@ class BatchStatus(str, Enum):
     RUNNING = "running"
     PAUSED = "paused"
     COMPLETED = "completed"
+    FINALIZED = "finalized"
     FAILED = "failed"
 
 

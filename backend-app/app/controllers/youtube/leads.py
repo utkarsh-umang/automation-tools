@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.repositories.youtube import batch_repo, lead_repo
+from app.schemas.youtube.batch import BatchStatus
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,11 @@ def export_leads(batch_id: str) -> StreamingResponse:
     batch = batch_repo.get_by_id(batch_id)
     if batch is None:
         raise HTTPException(status_code=404, detail="Batch not found")
+    if batch.get("status") != BatchStatus.FINALIZED.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Batch must be finalized before exporting",
+        )
 
     leads = lead_repo.get_all_for_batch(batch_id)
 

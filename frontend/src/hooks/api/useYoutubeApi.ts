@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, YoutubeBatchesService, YoutubeCreditsService, YoutubeLeadsService } from '@/client'
 
-export type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed'
+export type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'finalized' | 'failed'
 export type TermStatus = 'pending' | 'running' | 'done' | 'failed'
 
 export interface SearchTermItem {
@@ -167,6 +167,25 @@ export function useDeleteBatchMutation() {
       void qc.invalidateQueries({ queryKey: youtubeKeys.batches() })
       void qc.invalidateQueries({ queryKey: youtubeKeys.credits() })
       void qc.removeQueries({ queryKey: youtubeKeys.batch(batchId) })
+    },
+  })
+}
+
+export function useFinalizeBatchMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await fetch(`/api/v1/youtube/batches/${batchId}/finalize`, { method: 'POST' })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}))
+        throw new Error(body?.detail ?? `Finalize failed (${response.status})`)
+      }
+      return response.json() as Promise<{ message: string; duplicatesRemoved: number }>
+    },
+    onSuccess: (_, batchId) => {
+      void qc.invalidateQueries({ queryKey: youtubeKeys.batch(batchId) })
+      void qc.invalidateQueries({ queryKey: youtubeKeys.batches() })
+      void qc.invalidateQueries({ queryKey: youtubeKeys.leads(batchId, 1, 50) })
     },
   })
 }

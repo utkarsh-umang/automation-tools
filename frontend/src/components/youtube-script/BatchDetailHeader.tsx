@@ -5,6 +5,7 @@ function StatusBadge({ status }: { status: BatchStatus }) {
     running: { label: 'Running', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.35)', color: '#1d4ed8' },
     paused: { label: 'Paused', bg: '#fffbeb', border: '#fcd34d', color: '#b45309' },
     completed: { label: 'Completed', bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' },
+    finalized: { label: 'Finalized', bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8' },
     queued: { label: 'Queued', bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' },
     failed: { label: 'Failed', bg: '#fff1f2', border: '#fecdd3', color: '#be123c' },
   }

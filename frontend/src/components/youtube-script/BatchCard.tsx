@@ -1,4 +1,4 @@
-type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed'
+type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'finalized' | 'failed'
 
 interface BatchCardProps {
   name: string
@@ -34,6 +34,12 @@ function StatusBadge({ status }: { status: BatchStatus }) {
       bg: '#f0fdf4',
       border: '#bbf7d0',
       color: '#15803d',
+    },
+    finalized: {
+      label: 'Finalized',
+      bg: '#eff6ff',
+      border: '#93c5fd',
+      color: '#1d4ed8',
     },
     queued: {
       label: 'Queued',
@@ -106,13 +112,13 @@ export function BatchCard({
         <StatusBadge status={status} />
       </div>
 
-      {status === 'completed' ? (
+      {status === 'completed' || status === 'finalized' ? (
         <div className="flex items-center justify-between gap-2 text-sm">
           <span style={{ color: '#6b7280' }}>
             {processedTerms} of {totalTerms} terms processed
           </span>
-          <span className="font-semibold" style={{ color: '#15803d' }}>
-            Export available
+          <span className="font-semibold" style={{ color: status === 'finalized' ? '#1d4ed8' : '#15803d' }}>
+            {status === 'finalized' ? 'Ready to export' : 'Needs finalization'}
           </span>
         </div>
       ) : (

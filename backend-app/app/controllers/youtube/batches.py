@@ -177,6 +177,27 @@ def trigger_batch(batch_id: str) -> dict:
     return {"message": "Batch run dispatched", "batchId": batch_id}
 
 
+@router.post("/{batch_id}/finalize")
+def finalize_batch(batch_id: str) -> dict:
+    """Deduplicate leads and mark batch as finalized."""
+    batch = batch_repo.get_by_id(batch_id)
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Batch not found")
+
+    status = batch.get("status")
+    if status == BatchStatus.FINALIZED.value:
+        raise HTTPException(status_code=400, detail="Batch is already finalized")
+    if status != BatchStatus.COMPLETED.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Batch must be fully processed before finalizing",
+        )
+
+    removed = lead_repo.deduplicate_for_batch(batch_id)
+    batch_repo.update_status(batch_id, BatchStatus.FINALIZED)
+    return {"message": "Batch finalized", "duplicatesRemoved": removed}
+
+
 @router.delete("/{batch_id}", status_code=204)
 def delete_batch(batch_id: str) -> None:
     """Hard-delete a batch and all its associated terms and leads."""

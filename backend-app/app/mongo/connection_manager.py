@@ -51,14 +51,9 @@ class MongoConnectionManager:
             return self._connections[cache_key]
 
         uri = self._get_uri()
-        if config.ENVIRONMENT == "local":
-            from pymongo import MongoClient
+        from pymongo import MongoClient
 
-            client = MongoClient(uri)
-        else:
-            from motor.motor_asyncio import AsyncIOMotorClient
-
-            client = AsyncIOMotorClient(uri)
+        client = MongoClient(uri)
 
         database = client[db]
         self._connections[cache_key] = database

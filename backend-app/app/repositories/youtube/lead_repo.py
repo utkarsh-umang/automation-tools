@@ -1,6 +1,7 @@
 """Repository for yt_leads collection."""
 
 from app.mongo.delete import delete_multiple_documents
+from app.mongo.get_connection import get_database_connection
 from app.mongo.insert import insert_multiple_documents
 from app.mongo.read import fetch_from_collection_with_options
 from app.mongo.update import count_documents
@@ -50,6 +51,42 @@ def get_all_for_batch(batch_id: str) -> list[dict]:
         limit=None,
     )
     return result.data if result.success else []
+
+
+def deduplicate_for_batch(batch_id: str) -> int:
+    """Remove duplicate channels for a batch, keeping the one with the highest score.
+
+    Returns the number of duplicates removed.
+    """
+    db = get_database_connection()
+    coll = db[COLLECTION]
+
+    # Aggregate: group by channelId, collect all doc _ids and max score's _id
+    pipeline = [
+        {"$match": {"batchId": batch_id}},
+        {"$sort": {"score": -1}},
+        {
+            "$group": {
+                "_id": "$channelId",
+                "bestId": {"$first": "$_id"},
+                "allIds": {"$push": "$_id"},
+                "count": {"$sum": 1},
+            }
+        },
+        {"$match": {"count": {"$gt": 1}}},
+    ]
+    duplicates = list(coll.aggregate(pipeline))
+
+    ids_to_delete = []
+    for group in duplicates:
+        for doc_id in group["allIds"]:
+            if doc_id != group["bestId"]:
+                ids_to_delete.append(doc_id)
+
+    if ids_to_delete:
+        coll.delete_many({"_id": {"$in": ids_to_delete}})
+
+    return len(ids_to_delete)
 
 
 def delete_for_batch(batch_id: str) -> None:

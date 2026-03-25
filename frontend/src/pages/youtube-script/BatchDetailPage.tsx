@@ -7,6 +7,7 @@ import {
   useBatchLeadsQuery,
   useCreditsTodayQuery,
   useExportBatchMutation,
+  useFinalizeBatchMutation,
   useTriggerBatchMutation,
 } from '@/hooks/api/useYoutubeApi'
 import { CircleQuestionMark } from 'lucide-react'
@@ -19,6 +20,7 @@ export function BatchDetailPage() {
   const detailQuery = useBatchDetailQuery(batchId, 10_000)
   const creditsQuery = useCreditsTodayQuery(10_000)
   const triggerMutation = useTriggerBatchMutation()
+  const finalizeMutation = useFinalizeBatchMutation()
   const exportMutation = useExportBatchMutation()
   const shouldPollLeads = detailQuery.data?.status === 'running' || detailQuery.data?.status === 'paused'
   const leadsQuery = useBatchLeadsQuery(batchId, page, pageSize, shouldPollLeads ? 10_000 : 0)
@@ -93,6 +95,7 @@ export function BatchDetailPage() {
     running: { bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.25)', color: '#1d4ed8', label: 'Running' },
     paused: { bg: '#fffbeb', border: '#fcd34d', color: '#b45309', label: 'Paused' },
     completed: { bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d', label: 'Completed' },
+    finalized: { bg: '#eff6ff', border: '#93c5fd', color: '#1d4ed8', label: 'Finalized' },
     queued: { bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280', label: 'Queued' },
     failed: { bg: '#fff1f2', border: '#fecdd3', color: '#be123c', label: 'Failed' },
   }
@@ -129,13 +132,33 @@ export function BatchDetailPage() {
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            {exportMutation.isError && (
+            {(exportMutation.isError || finalizeMutation.isError) && (
               <p className="text-xs font-medium" style={{ color: '#be123c' }}>
-                {getApiErrorMessage(exportMutation.error)}
+                {getApiErrorMessage(exportMutation.error ?? finalizeMutation.error)}
+              </p>
+            )}
+            {finalizeMutation.isSuccess && (
+              <p className="text-xs font-medium" style={{ color: '#15803d' }}>
+                Finalized — {finalizeMutation.data.duplicatesRemoved} duplicates removed
               </p>
             )}
             <div className="flex items-center gap-2">
             {batch.status === 'completed' && (
+              <button
+                type="button"
+                onClick={() => finalizeMutation.mutate(batch._id)}
+                disabled={finalizeMutation.isPending}
+                title="Deduplicate channels and finalize batch"
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                style={{
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
+                }}
+              >
+                {finalizeMutation.isPending ? 'Finalizing...' : 'Finalize Batch'}
+              </button>
+            )}
+            {batch.status === 'finalized' && (
               <button
                 type="button"
                 onClick={() => exportMutation.mutate(batch._id)}
