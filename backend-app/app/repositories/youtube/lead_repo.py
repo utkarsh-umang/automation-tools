@@ -1,5 +1,7 @@
 """Repository for yt_leads collection."""
 
+from bson import ObjectId
+
 from app.mongo.delete import delete_multiple_documents
 from app.mongo.get_connection import get_database_connection
 from app.mongo.insert import insert_multiple_documents
@@ -91,3 +93,18 @@ def deduplicate_for_batch(batch_id: str) -> int:
 
 def delete_for_batch(batch_id: str) -> None:
     delete_multiple_documents(COLLECTION, {"batchId": batch_id})
+
+
+def delete_for_batch_term(batch_id: str, term_id: str) -> int:
+    """Delete leads for one search term. Returns deleted count."""
+    query = {
+        "batchId": batch_id,
+        "$or": [
+            {"searchTermId": term_id},
+            {"searchTermId": ObjectId(term_id)},
+        ],
+    }
+    result = delete_multiple_documents(COLLECTION, query)
+    if not result.success:
+        return 0
+    return int(result.data.get("deleted_count", 0))

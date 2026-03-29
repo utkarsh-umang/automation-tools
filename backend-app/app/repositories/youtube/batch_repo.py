@@ -62,13 +62,17 @@ def update_status(
     *,
     completed_at: datetime | None = None,
     last_triggered_at: datetime | None = None,
+    clear_completed_at: bool = False,
 ) -> None:
     fields: dict = {"status": status.value}
     if completed_at is not None:
         fields["completedAt"] = completed_at
     if last_triggered_at is not None:
         fields["lastTriggeredAt"] = last_triggered_at
-    update_document(COLLECTION, {"_id": ObjectId(batch_id)}, {"$set": fields})
+    update: dict = {"$set": fields}
+    if clear_completed_at:
+        update["$unset"] = {"completedAt": ""}
+    update_document(COLLECTION, {"_id": ObjectId(batch_id)}, update)
 
 
 def increment_processed_terms(batch_id: str) -> None:
@@ -76,6 +80,17 @@ def increment_processed_terms(batch_id: str) -> None:
         COLLECTION,
         {"_id": ObjectId(batch_id)},
         {"$inc": {"processedTerms": 1}},
+    )
+
+
+def decrement_processed_terms(batch_id: str, n: int = 1) -> None:
+    """Decrease processedTerms by n without going below zero."""
+    if n <= 0:
+        return
+    update_document(
+        COLLECTION,
+        {"_id": ObjectId(batch_id), "processedTerms": {"$gte": n}},
+        {"$inc": {"processedTerms": -n}},
     )
 
 

@@ -193,6 +193,38 @@ export function useFinalizeBatchMutation() {
   })
 }
 
+export interface ResetTermToPendingResult {
+  message: string
+  batchId: string
+  termId: string
+  leadsRemoved: number
+  dispatched: boolean
+  dispatchBlockedReason: string | null
+}
+
+export function useResetSearchTermToPendingMutation(batchId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (termId: string) => {
+      const response = await fetch(
+        `/api/v1/youtube/batches/${batchId}/terms/${termId}/reset-to-pending`,
+        { method: 'POST' },
+      )
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const detail = typeof body?.detail === 'string' ? body.detail : `Reset failed (${response.status})`
+        throw new Error(detail)
+      }
+      return body as ResetTermToPendingResult
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: youtubeKeys.batch(batchId) })
+      void qc.invalidateQueries({ queryKey: youtubeKeys.batches() })
+      void qc.invalidateQueries({ queryKey: youtubeKeys.credits() })
+    },
+  })
+}
+
 export function useExportBatchMutation() {
   return useMutation({
     mutationFn: async (batchId: string) => {

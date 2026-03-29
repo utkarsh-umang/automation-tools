@@ -115,7 +115,7 @@ def mark_failed(term_id: str, error_message: str) -> None:
 
 
 def reset_to_pending(term_id: str) -> None:
-    """Roll back a term to pending (credit limit mid-run)."""
+    """Roll back a term to pending; clears stats and error state."""
     update_document(
         COLLECTION,
         {"_id": ObjectId(term_id)},
@@ -124,6 +124,11 @@ def reset_to_pending(term_id: str) -> None:
                 "status": TermStatus.PENDING.value,
                 "startedAt": None,
                 "errorMessage": None,
+                "creditsUsed": 0,
+                "channelsDiscovered": 0,
+                "channelsQualified": 0,
+                "emailsFound": 0,
+                "completedAt": None,
             }
         },
     )

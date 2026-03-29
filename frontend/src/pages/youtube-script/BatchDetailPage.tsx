@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import type { UseMutationResult } from '@tanstack/react-query'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import {
   getApiErrorMessage,
+  type BatchStatus,
   type SearchTermItem,
   type TermStatus,
   useBatchDetailQuery,
@@ -10,7 +12,9 @@ import {
   useCreditsTodayQuery,
   useExportBatchMutation,
   useFinalizeBatchMutation,
+  useResetSearchTermToPendingMutation,
   useTriggerBatchMutation,
+  type ResetTermToPendingResult,
 } from '@/hooks/api/useYoutubeApi'
 import { ChevronDown, CircleQuestionMark } from 'lucide-react'
 
@@ -25,6 +29,7 @@ export function BatchDetailPage() {
   const triggerMutation = useTriggerBatchMutation()
   const finalizeMutation = useFinalizeBatchMutation()
   const exportMutation = useExportBatchMutation()
+  const resetTermMutation = useResetSearchTermToPendingMutation(batchId ?? '')
   const shouldPollLeads = detailQuery.data?.status === 'running' || detailQuery.data?.status === 'paused'
   const leadsQuery = useBatchLeadsQuery(batchId, page, pageSize, shouldPollLeads ? 10_000 : 0)
   const batch = detailQuery.data
@@ -93,6 +98,8 @@ export function BatchDetailPage() {
   const canTrigger = batch.status === 'queued' || batch.status === 'paused'
   const blockedByOtherBatch =
     Boolean(creditsQuery.data?.activeBatchId) && creditsQuery.data?.activeBatchId !== batch._id
+  const allTermsDone = terms.length > 0 && terms.every((t) => t.status === 'done')
+  const canFinalizeBatch = batch.status === 'completed' && allTermsDone
 
   const statusTone: Record<string, { bg: string; border: string; color: string; label: string }> = {
     running: { bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.25)', color: '#1d4ed8', label: 'Running' },
@@ -135,9 +142,13 @@ export function BatchDetailPage() {
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            {(exportMutation.isError || finalizeMutation.isError) && (
+            {(exportMutation.isError || finalizeMutation.isError || resetTermMutation.isError) && (
               <p className="text-xs font-medium" style={{ color: '#be123c' }}>
-                {getApiErrorMessage(exportMutation.error ?? finalizeMutation.error)}
+                {(() => {
+                  const err =
+                    resetTermMutation.error ?? finalizeMutation.error ?? exportMutation.error
+                  return err instanceof Error ? err.message : getApiErrorMessage(err)
+                })()}
               </p>
             )}
             {finalizeMutation.isSuccess && (
@@ -147,19 +158,30 @@ export function BatchDetailPage() {
             )}
             <div className="flex items-center gap-2">
             {batch.status === 'completed' && (
-              <button
-                type="button"
-                onClick={() => finalizeMutation.mutate(batch._id)}
-                disabled={finalizeMutation.isPending}
-                title="Deduplicate channels and finalize batch"
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                style={{
-                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
-                }}
-              >
-                {finalizeMutation.isPending ? 'Finalizing...' : 'Finalize Batch'}
-              </button>
+              <div className="flex flex-col items-end gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => finalizeMutation.mutate(batch._id)}
+                  disabled={finalizeMutation.isPending || !canFinalizeBatch}
+                  title={
+                    canFinalizeBatch
+                      ? 'Deduplicate channels and finalize batch'
+                      : 'All search terms must complete successfully before finalizing'
+                  }
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                    boxShadow: '0 1px 2px rgba(37,99,235,0.4), 0 4px 12px rgba(37,99,235,0.2)',
+                  }}
+                >
+                  {finalizeMutation.isPending ? 'Finalizing...' : 'Finalize Batch'}
+                </button>
+                {!canFinalizeBatch && (
+                  <span className="max-w-56 text-right text-[10px] leading-tight" style={{ color: '#b45309' }}>
+                    Finalize requires every term to succeed. Reset failed or stuck terms below, then run the batch again.
+                  </span>
+                )}
+              </div>
             )}
             {batch.status === 'finalized' && (
               <button
@@ -200,6 +222,8 @@ export function BatchDetailPage() {
           channelsTotal={leadsData?.total ?? 0}
           emailsTotal={totalEmailsFound}
           terms={terms}
+          batchStatus={batch.status}
+          resetTermMutation={resetTermMutation}
         />
 
         <div className="rounded-xl border p-2.5" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
@@ -255,6 +279,8 @@ interface StatsAccordionProps {
   channelsTotal: number
   emailsTotal: number
   terms: SearchTermItem[]
+  batchStatus: BatchStatus
+  resetTermMutation: UseMutationResult<ResetTermToPendingResult, Error, string>
 }
 
 function StatsAccordion({
@@ -266,6 +292,8 @@ function StatsAccordion({
   channelsTotal,
   emailsTotal,
   terms,
+  batchStatus,
+  resetTermMutation,
 }: StatsAccordionProps) {
   return (
     <div className="rounded-xl border" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
@@ -303,7 +331,7 @@ function StatsAccordion({
       >
         <div className="overflow-hidden">
           <div className="border-t px-3 pb-3 pt-2" style={{ borderColor: '#e5e7eb' }}>
-            <TermAnalyticsTable terms={terms} />
+            <TermAnalyticsTable terms={terms} batchStatus={batchStatus} resetTermMutation={resetTermMutation} />
           </div>
         </div>
       </div>
@@ -313,7 +341,15 @@ function StatsAccordion({
 
 const TERM_ANALYTICS_PAGE_SIZE = 5
 
-function TermAnalyticsTable({ terms }: { terms: SearchTermItem[] }) {
+function TermAnalyticsTable({
+  terms,
+  batchStatus,
+  resetTermMutation,
+}: {
+  terms: SearchTermItem[]
+  batchStatus: BatchStatus
+  resetTermMutation: UseMutationResult<ResetTermToPendingResult, Error, string>
+}) {
   const [page, setPage] = useState(1)
 
   const totalTerms = terms.length
@@ -347,25 +383,27 @@ function TermAnalyticsTable({ terms }: { terms: SearchTermItem[] }) {
           background: 'linear-gradient(90deg, #0a0f1e 0%, #0f1f4a 60%, #0a0f1e 100%)',
         }}
       >
-        <div className="col-span-5 sm:col-span-6">Search term</div>
-        <div className="col-span-4 sm:col-span-4">Status</div>
+        <div className="col-span-4 sm:col-span-5">Search term</div>
+        <div className="col-span-3 sm:col-span-3">Status</div>
         <div className="col-span-3 sm:col-span-2 text-right">
           <span className="inline-flex items-center justify-end gap-1">
             Results
             <TermResultsTooltipIcon />
           </span>
         </div>
+        <div className="col-span-2 text-right sm:col-span-2">Action</div>
       </div>
       <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
         {pageRows.map((t) => {
           const tone = termStatusTone(t.status)
           const results = formatTermResults(t)
+          const showReset = canResetTermToPending(batchStatus, t)
           return (
             <div key={t._id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
-              <div className="col-span-5 truncate sm:col-span-6" style={{ color: '#111827' }} title={t.term}>
+              <div className="col-span-4 truncate sm:col-span-5" style={{ color: '#111827' }} title={t.term}>
                 {t.term}
               </div>
-              <div className="col-span-4 sm:col-span-4">
+              <div className="col-span-3 sm:col-span-3">
                 <span
                   className="inline-block max-w-full truncate rounded px-2 py-0.5 text-[11px] font-semibold"
                   style={{
@@ -380,6 +418,24 @@ function TermAnalyticsTable({ terms }: { terms: SearchTermItem[] }) {
               </div>
               <div className="col-span-3 text-right tabular-nums sm:col-span-2" style={{ color: '#6b7280' }}>
                 {results}
+              </div>
+              <div className="col-span-2 flex justify-end">
+                {showReset ? (
+                  <button
+                    type="button"
+                    className="rounded border px-2 py-0.5 text-[11px] font-semibold disabled:opacity-50"
+                    style={{ borderColor: '#93c5fd', color: '#1d4ed8' }}
+                    disabled={resetTermMutation.isPending}
+                    title="Reset term to pending and re-queue processing"
+                    onClick={() => resetTermMutation.mutate(t._id)}
+                  >
+                    {resetTermMutation.isPending ? '…' : 'Reset'}
+                  </button>
+                ) : (
+                  <span className="text-[11px]" style={{ color: '#d1d5db' }}>
+                    —
+                  </span>
+                )}
               </div>
             </div>
           )
@@ -417,6 +473,11 @@ function TermAnalyticsTable({ terms }: { terms: SearchTermItem[] }) {
       </div>
     </div>
   )
+}
+
+function canResetTermToPending(batchStatus: BatchStatus, term: SearchTermItem): boolean {
+  if (batchStatus === 'running') return false
+  return term.status === 'failed' || term.status === 'running'
 }
 
 function termStatusTone(status: TermStatus): { label: string; bg: string; border: string; color: string } {
