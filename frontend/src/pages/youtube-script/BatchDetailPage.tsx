@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import {
   getApiErrorMessage,
   type SearchTermItem,
+  type TermStatus,
   useBatchDetailQuery,
   useBatchLeadsQuery,
   useCreditsTodayQuery,
@@ -11,12 +12,13 @@ import {
   useFinalizeBatchMutation,
   useTriggerBatchMutation,
 } from '@/hooks/api/useYoutubeApi'
-import { CircleQuestionMark } from 'lucide-react'
+import { ChevronDown, CircleQuestionMark } from 'lucide-react'
 
 export function BatchDetailPage() {
   const { batchId } = useParams<{ batchId: string }>()
   const navigate = useNavigate()
   const [page, setPage] = useState(1)
+  const [statsAccordionOpen, setStatsAccordionOpen] = useState(false)
   const pageSize = 10
   const detailQuery = useBatchDetailQuery(batchId, 10_000)
   const creditsQuery = useCreditsTodayQuery(10_000)
@@ -189,13 +191,16 @@ export function BatchDetailPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-xl border p-3 sm:grid-cols-5" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
-          <Stat label="Processed" value={String(batch.processedTerms)} compact />
-          <Stat label="Remaining" value={String(remaining)} compact />
-          <Stat label="Running" value={String(runningTerms)} compact />
-          <Stat label="Channels" value={String(leadsData?.total ?? 0)} compact />
-          <Stat label="Emails" value={String(totalEmailsFound)} compact />
-        </div>
+        <StatsAccordion
+          open={statsAccordionOpen}
+          onToggle={() => setStatsAccordionOpen((o) => !o)}
+          processedTerms={batch.processedTerms}
+          remaining={remaining}
+          runningTerms={runningTerms}
+          channelsTotal={leadsData?.total ?? 0}
+          emailsTotal={totalEmailsFound}
+          terms={terms}
+        />
 
         <div className="rounded-xl border p-2.5" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
           <div className="mb-1 flex items-center justify-between">
@@ -236,6 +241,225 @@ export function BatchDetailPage() {
         )}
       </div>
     </AppShell>
+  )
+}
+
+const statsAccordionPanelId = 'batch-stats-term-analytics'
+
+interface StatsAccordionProps {
+  open: boolean
+  onToggle: () => void
+  processedTerms: number
+  remaining: number
+  runningTerms: number
+  channelsTotal: number
+  emailsTotal: number
+  terms: SearchTermItem[]
+}
+
+function StatsAccordion({
+  open,
+  onToggle,
+  processedTerms,
+  remaining,
+  runningTerms,
+  channelsTotal,
+  emailsTotal,
+  terms,
+}: StatsAccordionProps) {
+  return (
+    <div className="rounded-xl border" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
+      <div className="flex items-stretch gap-2 p-3">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-5">
+          <Stat label="Processed" value={String(processedTerms)} compact />
+          <Stat label="Remaining" value={String(remaining)} compact />
+          <Stat label="Running" value={String(runningTerms)} compact />
+          <Stat label="Channels" value={String(channelsTotal)} compact />
+          <Stat label="Emails" value={String(emailsTotal)} compact />
+        </div>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex shrink-0 items-center justify-center self-center rounded-lg border p-2 transition-colors hover:bg-gray-50"
+          style={{ borderColor: '#e5e7eb' }}
+          aria-expanded={open}
+          aria-controls={statsAccordionPanelId}
+          title={open ? 'Hide term analytics' : 'Show term analytics'}
+        >
+          <ChevronDown
+            size={20}
+            strokeWidth={2}
+            className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            style={{ color: '#6b7280' }}
+            aria-hidden
+          />
+        </button>
+      </div>
+      <div
+        id={statsAccordionPanelId}
+        role="region"
+        aria-label="Search term analytics"
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t px-3 pb-3 pt-2" style={{ borderColor: '#e5e7eb' }}>
+            <TermAnalyticsTable terms={terms} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const TERM_ANALYTICS_PAGE_SIZE = 5
+
+function TermAnalyticsTable({ terms }: { terms: SearchTermItem[] }) {
+  const [page, setPage] = useState(1)
+
+  const totalTerms = terms.length
+  const totalPages = Math.max(1, Math.ceil(totalTerms / TERM_ANALYTICS_PAGE_SIZE))
+
+  useEffect(() => {
+    setPage((p) => Math.min(p, totalPages))
+  }, [totalPages])
+
+  if (terms.length === 0) {
+    return (
+      <p className="py-2 text-sm" style={{ color: '#6b7280' }}>
+        No search terms in this batch.
+      </p>
+    )
+  }
+
+  const start = (page - 1) * TERM_ANALYTICS_PAGE_SIZE
+  const pageRows = terms.slice(start, start + TERM_ANALYTICS_PAGE_SIZE)
+
+  return (
+    <div className="flex flex-col overflow-hidden rounded-lg border" style={{ borderColor: '#e5e7eb' }}>
+      <p className="border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ borderColor: '#e5e7eb', color: '#6b7280' }}>
+        By search term
+      </p>
+      <div
+        className="grid grid-cols-12 gap-2 border-b px-3 py-2 text-[11px] font-semibold uppercase tracking-wide"
+        style={{
+          borderColor: 'rgba(37,99,235,0.2)',
+          color: 'rgba(255,255,255,0.65)',
+          background: 'linear-gradient(90deg, #0a0f1e 0%, #0f1f4a 60%, #0a0f1e 100%)',
+        }}
+      >
+        <div className="col-span-5 sm:col-span-6">Search term</div>
+        <div className="col-span-4 sm:col-span-4">Status</div>
+        <div className="col-span-3 sm:col-span-2 text-right">
+          <span className="inline-flex items-center justify-end gap-1">
+            Results
+            <TermResultsTooltipIcon />
+          </span>
+        </div>
+      </div>
+      <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
+        {pageRows.map((t) => {
+          const tone = termStatusTone(t.status)
+          const results = formatTermResults(t)
+          return (
+            <div key={t._id} className="grid grid-cols-12 gap-2 px-3 py-2 text-sm items-center">
+              <div className="col-span-5 truncate sm:col-span-6" style={{ color: '#111827' }} title={t.term}>
+                {t.term}
+              </div>
+              <div className="col-span-4 sm:col-span-4">
+                <span
+                  className="inline-block max-w-full truncate rounded px-2 py-0.5 text-[11px] font-semibold"
+                  style={{
+                    backgroundColor: tone.bg,
+                    border: `1px solid ${tone.border}`,
+                    color: tone.color,
+                  }}
+                  title={t.status === 'failed' && t.errorMessage ? t.errorMessage : undefined}
+                >
+                  {tone.label}
+                </span>
+              </div>
+              <div className="col-span-3 text-right tabular-nums sm:col-span-2" style={{ color: '#6b7280' }}>
+                {results}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex items-center justify-between border-t px-3 py-2" style={{ borderColor: '#e5e7eb' }}>
+        <span className="text-xs" style={{ color: '#6b7280' }}>
+          {totalTerms} search term{totalTerms === 1 ? '' : 's'}
+        </span>
+        {totalTerms > TERM_ANALYTICS_PAGE_SIZE && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded border px-2.5 py-1 text-xs disabled:opacity-50"
+              style={{ borderColor: '#e5e7eb' }}
+            >
+              Prev
+            </button>
+            <span className="text-xs" style={{ color: '#6b7280' }}>
+              Page {page} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="rounded border px-2.5 py-1 text-xs disabled:opacity-50"
+              style={{ borderColor: '#e5e7eb' }}
+            >
+              Next
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function termStatusTone(status: TermStatus): { label: string; bg: string; border: string; color: string } {
+  switch (status) {
+    case 'done':
+      return { label: 'Completed', bg: '#f0fdf4', border: '#bbf7d0', color: '#15803d' }
+    case 'running':
+      return { label: 'Running', bg: 'rgba(37,99,235,0.08)', border: 'rgba(37,99,235,0.25)', color: '#1d4ed8' }
+    case 'pending':
+      return { label: 'Yet to process', bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' }
+    case 'failed':
+      return { label: 'Failed', bg: '#fff1f2', border: '#fecdd3', color: '#be123c' }
+    default:
+      return { label: status, bg: '#f9fafb', border: '#e5e7eb', color: '#6b7280' }
+  }
+}
+
+/** Qualified channels stored for this term (after filters). Pending/running: not available yet. */
+function formatTermResults(term: SearchTermItem): string {
+  if (term.status === 'pending' || term.status === 'running') {
+    return '—'
+  }
+  return String(term.channelsQualified ?? 0)
+}
+
+function TermResultsTooltipIcon() {
+  return (
+    <span className="group relative inline-flex">
+      <CircleQuestionMark
+        size={12}
+        strokeWidth={2}
+        className="cursor-help"
+        style={{ color: '#93c5fd' }}
+        aria-label="What counts as a result"
+      />
+      <div
+        className="pointer-events-none absolute right-0 top-full z-10 mt-2 w-72 rounded-lg border bg-white p-2.5 text-[11px] leading-relaxed shadow opacity-0 translate-y-1 transition-all duration-150 group-hover:opacity-100 group-hover:translate-y-0"
+        style={{ borderColor: '#dbeafe', color: '#1f2937' }}
+      >
+        Results is the number of qualified channels saved for that search term after your batch filters (subs, region,
+        uploads, views). It matches how many leads in the table below are attributed to that term.
+      </div>
+    </span>
   )
 }
 

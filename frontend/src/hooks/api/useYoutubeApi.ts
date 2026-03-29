@@ -10,6 +10,8 @@ export interface SearchTermItem {
   status: TermStatus
   creditsUsed?: number
   emailsFound?: number
+  channelsDiscovered?: number
+  channelsQualified?: number
   errorMessage?: string | null
 }
 
