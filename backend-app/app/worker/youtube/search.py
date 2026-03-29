@@ -14,11 +14,11 @@ from app.worker.youtube.credits import CreditCounter, CreditLimitExceeded
 
 logger = logging.getLogger(__name__)
 
-SEARCH_ORDERS = ["date", "viewCount", "relevance"]
+SEARCH_ORDERS = ["relevance"]
 MAX_SEARCH_PAGES = 60
 LOW_YIELD_PAGES_TO_STOP = 3
 MIN_NEW_CHANNELS_PER_PAGE = 5
-TARGET_CHANNEL_POOL = 2000
+TARGET_CHANNEL_POOL = 500
 SEARCH_CREDIT_COST = 100
 BASE_URL = "https://www.googleapis.com/youtube/v3"
 
