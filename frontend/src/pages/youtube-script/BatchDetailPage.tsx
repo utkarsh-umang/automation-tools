@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import {
   getApiErrorMessage,
+  type SearchTermItem,
   useBatchDetailQuery,
   useBatchLeadsQuery,
   useCreditsTodayQuery,
@@ -223,6 +224,7 @@ export function BatchDetailPage() {
         ) : (
           <LeadsTableSection
             leadsData={leadsData}
+            terms={terms}
             isLoading={leadsQuery.isLoading}
             isError={leadsQuery.isError}
             error={leadsQuery.error}
@@ -241,6 +243,7 @@ interface LeadsTableSectionProps {
   leadsData: {
     leads: Array<{
       _id: string
+      searchTermId?: string
       channelName?: string
       channelUrl?: string
       email?: string | null
@@ -250,6 +253,7 @@ interface LeadsTableSectionProps {
     }>
     total: number
   } | undefined
+  terms: SearchTermItem[]
   isLoading: boolean
   isError: boolean
   error: unknown
@@ -261,6 +265,7 @@ interface LeadsTableSectionProps {
 
 function LeadsTableSection({
   leadsData,
+  terms,
   isLoading,
   isError,
   error,
@@ -271,6 +276,7 @@ function LeadsTableSection({
 }: LeadsTableSectionProps) {
   const rows = leadsData?.leads ?? []
   const fillerRowCount = Math.max(0, pageSize - rows.length)
+  const termLabelById = Object.fromEntries(terms.map((t) => [t._id, t.term]))
 
   return (
     <div className="flex flex-col rounded-xl border" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
@@ -282,8 +288,9 @@ function LeadsTableSection({
           background: 'linear-gradient(90deg, #0a0f1e 0%, #0f1f4a 60%, #0a0f1e 100%)',
         }}
       >
-        <div className="col-span-4">Channel</div>
-        <div className="col-span-3">Email</div>
+        <div className="col-span-3">Channel</div>
+        <div className="col-span-3">Search term</div>
+        <div className="col-span-2">Email</div>
         <div className="col-span-2">Subscribers</div>
         <div className="col-span-1">
           <span className="inline-flex items-center gap-1">
@@ -291,7 +298,7 @@ function LeadsTableSection({
             <ScoreTooltipIcon />
           </span>
         </div>
-        <div className="col-span-2">Status</div>
+        <div className="col-span-1">Status</div>
       </div>
       <div>
         {isLoading ? (
@@ -310,7 +317,7 @@ function LeadsTableSection({
           <div className="divide-y" style={{ borderColor: '#f3f4f6' }}>
             {rows.map((lead) => (
               <div key={lead._id} className="grid h-8 grid-cols-12 gap-2 px-4 text-sm items-center">
-                <div className="col-span-4 truncate" style={{ color: '#111827' }}>
+                <div className="col-span-3 truncate" style={{ color: '#111827' }}>
                   {lead.channelUrl ? (
                     <a
                       href={lead.channelUrl}
@@ -325,7 +332,14 @@ function LeadsTableSection({
                     lead.channelName ?? '—'
                   )}
                 </div>
-                <div className="col-span-3 truncate" style={{ color: '#6b7280' }}>
+                <div
+                  className="col-span-3 truncate"
+                  title={lead.searchTermId ? termLabelById[lead.searchTermId] : undefined}
+                  style={{ color: '#6b7280' }}
+                >
+                  {lead.searchTermId ? termLabelById[lead.searchTermId] ?? '—' : '—'}
+                </div>
+                <div className="col-span-2 truncate" style={{ color: '#6b7280' }}>
                   {lead.email ?? '—'}
                 </div>
                 <div className="col-span-2 tabular-nums" style={{ color: '#6b7280' }}>
@@ -334,7 +348,7 @@ function LeadsTableSection({
                 <div className="col-span-1 tabular-nums" style={{ color: '#6b7280' }}>
                   {lead.score ?? '—'}
                 </div>
-                <div className="col-span-2" style={{ color: '#6b7280' }}>
+                <div className="col-span-1 truncate" style={{ color: '#6b7280' }}>
                   {lead.emailStatus ?? 'unknown'}
                 </div>
               </div>

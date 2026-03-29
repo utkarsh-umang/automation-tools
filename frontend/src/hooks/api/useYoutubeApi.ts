@@ -37,6 +37,7 @@ export interface CreditsToday {
 
 export interface LeadItem {
   _id: string
+  searchTermId?: string
   channelName?: string
   channelUrl?: string
   subscribers?: number
