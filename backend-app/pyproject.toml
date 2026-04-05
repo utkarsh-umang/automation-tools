@@ -50,6 +50,7 @@ ignore = ["E501", "N802", "N815"]
 # ``main.py`` loads ``app.bootstrap_env`` before other imports so ``.env`` is in ``os.environ``
 # before any ``ai_agents`` (or similar) import-time checks.
 "main.py" = ["E402", "I001"]
+"scripts/verify_thumbnail_job_details_mongo.py" = ["E402"]
 
 [build-system]
 requires = ["poetry-core"]

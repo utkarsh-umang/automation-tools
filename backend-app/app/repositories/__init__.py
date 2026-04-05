@@ -1,1 +1,1 @@
-"""Repository layer — thin wrappers over mongo helpers."""
+"""Data access repositories (Postgres + Mongo)."""

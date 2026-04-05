@@ -36,6 +36,7 @@ async def clean_db() -> None:
     # Dispose the app's pool so stale event-loop-bound connections are cleared
     await app_engine.dispose()
     async with _cleanup_session() as session:
+        # CASCADE also clears ``thumbnail_jobs`` when that table exists (FK to users).
         await session.execute(text("TRUNCATE TABLE users RESTART IDENTITY CASCADE"))
         await session.commit()
     await asyncio.sleep(0)
