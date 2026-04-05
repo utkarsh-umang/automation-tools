@@ -1,5 +1,6 @@
 """FastAPI application entry point."""
 
+import app.bootstrap_env  # noqa: F401 - side effect: load .env into os.environ
 import uuid
 
 from fastapi import FastAPI
