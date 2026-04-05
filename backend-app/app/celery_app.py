@@ -11,6 +11,7 @@ celery_app = Celery(
     include=[
         "app.worker.orchestrator",
         "app.worker.process_term",
+        "app.worker.thumbnail.generate",
     ],
 )
 

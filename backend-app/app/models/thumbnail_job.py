@@ -3,7 +3,12 @@
 import uuid
 from datetime import UTC, datetime
 
+from sqlalchemy import Column, DateTime, text
 from sqlmodel import Field, SQLModel
+
+
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 class ThumbnailJob(SQLModel, table=True):
@@ -23,6 +28,23 @@ class ThumbnailJob(SQLModel, table=True):
     iteration: int = Field(default=1)
     result_url: str | None = Field(default=None)
     error: str | None = Field(default=None)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    completed_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(
+        default_factory=_utc_now,
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+            server_default=text("now()"),
+        ),
+    )
+    updated_at: datetime = Field(
+        default_factory=_utc_now,
+        sa_column=Column(
+            DateTime(timezone=True),
+            nullable=False,
+            server_default=text("now()"),
+        ),
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), nullable=True),
+    )

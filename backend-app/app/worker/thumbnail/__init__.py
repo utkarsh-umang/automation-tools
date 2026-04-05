@@ -1,0 +1,1 @@
+"""Thumbnail generation Celery tasks."""

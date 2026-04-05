@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     # ── Google Sheets ──
     GOOGLE_CREDENTIALS_FILE: str = "credentials.json"
 
+    # ── Thumbnail pipeline (S3 upload from Celery worker) ──
+    AWS_REGION: str = "ap-south-1"
+    THUMBNAIL_S3_BUCKET: str = "thumbnail-generator-ai-agent"
+    THUMBNAIL_S3_ENDPOINT_URL: str | None = None
+    THUMBNAIL_S3_PUBLIC_BASE_URL: str | None = None
+    THUMBNAIL_S3_USE_PRESIGNED_URL: bool = False
+    THUMBNAIL_S3_PRESIGNED_EXPIRES_SECONDS: int = 3600
+
+    # ── Observability (optional) ──
+    SENTRY_DSN: str | None = None
+
     @property
     def DATABASE_URL(self) -> str:
         return (
