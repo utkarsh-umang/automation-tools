@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 
 interface AppHeaderProps {
-  /** Breadcrumb segment after the brand (e.g. "Dashboard", "YouTube Script"). */
+  /** Breadcrumb segment after the brand (e.g. "Dashboard", "YouTube List Creator"). */
   breadcrumb?: string
 }
 

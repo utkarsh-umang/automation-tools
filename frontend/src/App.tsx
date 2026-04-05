@@ -62,7 +62,7 @@ function App() {
           <Route
             path="/thumbnail"
             element={
-              <AppShell breadcrumb="Thumbnail Project">
+              <AppShell breadcrumb="Thumbnail Creator">
                 <ThumbnailProject />
               </AppShell>
             }

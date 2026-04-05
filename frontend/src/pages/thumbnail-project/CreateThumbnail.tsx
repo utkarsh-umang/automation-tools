@@ -6,7 +6,7 @@ export function CreateThumbnail() {
 
   return (
     <div
-      className="rounded-xl w-full max-w-4xl"
+      className="w-full rounded-xl"
       style={{
         border: '1px solid #e5e7eb',
         backgroundColor: '#ffffff',

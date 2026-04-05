@@ -12,7 +12,7 @@ export function ThumbnailProject() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: '#0a0f1e' }}>
-            Thumbnail Project
+            Thumbnail Creator
           </h1>
           <p className="mt-1 max-w-2xl text-sm leading-relaxed" style={{ color: '#6b7280' }}>
             Manage and curate your visual assets for high-impact editorial storytelling.

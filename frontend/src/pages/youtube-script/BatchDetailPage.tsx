@@ -40,7 +40,7 @@ export function BatchDetailPage() {
 
   if (detailQuery.isLoading) {
     return (
-      <AppShell breadcrumb="YouTube Script">
+      <AppShell breadcrumb="YouTube List Creator">
         <div className="mx-auto max-w-7xl px-6 py-10">
           <p className="text-sm" style={{ color: '#6b7280' }}>
             Loading batch...
@@ -52,7 +52,7 @@ export function BatchDetailPage() {
 
   if (detailQuery.isError) {
     return (
-      <AppShell breadcrumb="YouTube Script">
+      <AppShell breadcrumb="YouTube List Creator">
         <div className="mx-auto max-w-7xl px-6 py-10">
           <p className="text-sm" style={{ color: '#be123c' }}>
             {getApiErrorMessage(detailQuery.error)}
@@ -72,7 +72,7 @@ export function BatchDetailPage() {
 
   if (!batch) {
     return (
-      <AppShell breadcrumb="YouTube Script">
+      <AppShell breadcrumb="YouTube List Creator">
         <div className="mx-auto max-w-7xl px-6 py-10">
           <p className="text-sm" style={{ color: '#6b7280' }}>
             Batch not found.
@@ -114,7 +114,7 @@ export function BatchDetailPage() {
   const queuedView = batch.status === 'queued'
 
   return (
-    <AppShell breadcrumb="YouTube Script">
+    <AppShell breadcrumb="YouTube List Creator">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:px-6">
         <div className="flex items-center justify-between rounded-xl border px-3 py-2.5" style={{ borderColor: '#e5e7eb', backgroundColor: '#ffffff' }}>
           <div className="min-w-0">

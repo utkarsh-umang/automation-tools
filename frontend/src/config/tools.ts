@@ -15,12 +15,21 @@ export interface ToolDefinition {
 export const tools: ToolDefinition[] = [
   {
     id: 'youtube-script',
-    label: 'YouTube Script',
+    label: 'YT List Creator',
     path: '/youtube-script',
     status: 'live',
     description: 'Find channels from search terms and extract contact emails across daily API quota.',
     tags: ['YouTube API', 'Email', 'Batches'],
     iconId: 'youtube',
+  },
+  {
+    id: 'thumbnail',
+    label: 'Thumbnail Creator',
+    path: '/thumbnail',
+    status: 'live',
+    description: 'Thumbnail concepts and batch exports for short-form.',
+    tags: ['Thumbnails', 'Creative'],
+    iconId: 'image',
   },
   {
     id: 'library-lp',
@@ -48,14 +57,5 @@ export const tools: ToolDefinition[] = [
     description: 'Create client-ready PDF lead magnets from outlines.',
     tags: ['PDF', 'Lead gen'],
     iconId: 'pdf',
-  },
-  {
-    id: 'thumbnail',
-    label: 'Thumbnail Project',
-    path: '/thumbnail',
-    status: 'soon',
-    description: 'Thumbnail concepts and batch exports for short-form.',
-    tags: ['Thumbnails', 'Creative'],
-    iconId: 'image',
   },
 ]
