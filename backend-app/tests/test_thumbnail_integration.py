@@ -45,14 +45,22 @@ pytestmark = [
 ]
 
 
-_THUMB_BODY: dict[str, Any] = {
-    "reference_image_url": "https://example.com/r.jpg",
-    "base_image_urls": ["https://example.com/b.jpg"],
-    "title": "T",
-    "include_title": True,
-    "creative_comments": "original-line",
-    "model": "gptimage",
-}
+_PNG = b"\x89PNG\r\n\x1a\n"
+
+
+def _create_thumb_multipart() -> dict[str, Any]:
+    return {
+        "files": [
+            ("reference_image", ("ref.png", _PNG, "image/png")),
+            ("base_images", ("b.png", _PNG, "image/png")),
+        ],
+        "data": {
+            "title": "T",
+            "include_title": "true",
+            "creative_comments": "original-line",
+            "model": "gptimage",
+        },
+    }
 
 _DUMMY_S3_URL = "https://integration-test.invalid/out.png"
 _DUMMY_PROMPT = "dummy-prompt-used"
@@ -122,10 +130,19 @@ def thumbnail_route_mongo_to_test_db(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def stub_agent_and_s3(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.services.thumbnail_service.upload_to_s3",
+        lambda _data, key: f"https://integration-input.invalid/{key}",
+    )
+
     def _agent(**_kwargs: Any) -> dict[str, Any]:
         return {"image_bytes": b"\x89PNG\r\n\x1a\n", "prompt_used": _DUMMY_PROMPT}
 
     monkeypatch.setattr("ai_agents.run_thumbnail_agent", _agent)
+    monkeypatch.setattr(
+        "app.worker.thumbnail.generate.get_s3_object_read_url",
+        lambda key: f"https://integration-read.invalid/{key}",
+    )
     monkeypatch.setattr(
         "app.worker.thumbnail.generate.upload_thumbnail_png",
         lambda _jid, _data: _DUMMY_S3_URL,
@@ -174,8 +191,8 @@ async def test_full_job_lifecycle_happy_path(
 
     r = await client.post(
         "/api/v1/thumbnails",
-        json=_THUMB_BODY,
         headers=member_h,
+        **_create_thumb_multipart(),
     )
     assert r.status_code == 200, r.text
     job_id = r.json()["id"]
@@ -191,6 +208,12 @@ async def test_full_job_lifecycle_happy_path(
     assert doc.get("model") == "gptimage"
     assert doc.get("creative_comments") == "original-line"
     assert doc.get("prompt_used") in (None, "")
+    assert doc.get("reference_image_s3_key") == (
+        f"thumbnail-inputs/{job_id}/reference.png"
+    )
+    assert doc.get("base_image_s3_keys") == [
+        f"thumbnail-inputs/{job_id}/base/0.png",
+    ]
 
     await _run_thumbnail_pipeline(job_id)
 
@@ -217,8 +240,8 @@ async def test_feedback_lineage_and_merged_comments(
 
     cr = await client.post(
         "/api/v1/thumbnails",
-        json=_THUMB_BODY,
         headers=member_h,
+        **_create_thumb_multipart(),
     )
     assert cr.status_code == 200, cr.text
     job1 = cr.json()["id"]

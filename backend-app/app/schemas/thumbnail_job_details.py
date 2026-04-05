@@ -9,6 +9,8 @@ Schema::
         "job_id": str,               # PG thumbnail_jobs.id (UUID string)
         "reference_image_url": str,
         "base_image_urls": list[str],
+        "reference_image_s3_key": str,   # optional; worker refreshes read URLs
+        "base_image_s3_keys": list[str],
         "title": str,
         "include_title": bool,
         "creative_comments": str,    # merged on each iteration
@@ -30,6 +32,8 @@ class ThumbnailJobDetailsPayload(TypedDict, total=False):
 
     reference_image_url: str
     base_image_urls: list[str]
+    reference_image_s3_key: str
+    base_image_s3_keys: list[str]
     title: str
     include_title: bool
     creative_comments: str

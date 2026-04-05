@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import uuid
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, get_current_user
+from app.core.config import config
 from app.db.session import get_db_session
 from app.schemas.thumbnails import (
-    ThumbnailCreateRequest,
     ThumbnailFeedbackRequest,
     ThumbnailHistoryResponse,
     ThumbnailJobCreatedResponse,
@@ -22,15 +23,59 @@ from app.services import thumbnail_service
 router = APIRouter()
 
 
+async def _read_limited_image(
+    f: UploadFile,
+    *,
+    field_label: str,
+) -> tuple[bytes, str | None, str | None]:
+    ctype = f.content_type
+    base_ct = (ctype or "").split(";")[0].strip().lower()
+    if not base_ct.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label} must use an image/* content type",
+        )
+    body = await f.read()
+    if len(body) > config.THUMBNAIL_INPUT_MAX_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=(
+                f"{field_label} exceeds maximum size "
+                f"({config.THUMBNAIL_INPUT_MAX_BYTES} bytes)"
+            ),
+        )
+    return body, f.filename, f.content_type
+
+
 @router.post("", response_model=ThumbnailJobCreatedResponse)
 async def create_thumbnail(
-    body: ThumbnailCreateRequest,
+    reference_image: UploadFile,
+    base_images: Annotated[list[UploadFile], File()] = [],
+    title: str = Form(),
+    include_title: bool = Form(),
+    creative_comments: str = Form(),
+    model: str = Form(),
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ThumbnailJobCreatedResponse:
-    """Create a thumbnail job; ``created_by`` is taken from the JWT only."""
+    """Create a thumbnail job from multipart uploads; ``created_by`` comes from the JWT only."""
+    reference = await _read_limited_image(
+        reference_image, field_label="reference_image"
+    )
+    base_tuples: list[tuple[bytes, str | None, str | None]] = []
+    for idx, uf in enumerate(base_images):
+        base_tuples.append(
+            await _read_limited_image(uf, field_label=f"base_images[{idx}]")
+        )
     return await thumbnail_service.create_thumbnail_job(
-        db, uuid.UUID(current_user.id), body
+        db,
+        uuid.UUID(current_user.id),
+        reference=reference,
+        base_images=base_tuples,
+        title=title,
+        include_title=include_title,
+        creative_comments=creative_comments,
+        model=model,
     )
 
 

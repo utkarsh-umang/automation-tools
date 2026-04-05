@@ -46,6 +46,32 @@ def _direct_url(key: str) -> str:
     return f"https://{host}/{quote(key, safe='/')}"
 
 
+def _object_read_url(client: BaseClient, key: str) -> str:
+    """Return a URL to read an existing object (direct or presigned per config)."""
+    if config.THUMBNAIL_S3_USE_PRESIGNED_URL:
+        try:
+            return client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": config.THUMBNAIL_S3_BUCKET, "Key": key},
+                ExpiresIn=config.THUMBNAIL_S3_PRESIGNED_EXPIRES_SECONDS,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise S3UploadError(
+                f"S3 presigned URL generation failed for key {key!r}: {exc}"
+            ) from exc
+    return _direct_url(key)
+
+
+def get_s3_object_read_url(key: str) -> str:
+    """Return an accessible read URL for an object already in the bucket."""
+    if not config.THUMBNAIL_S3_BUCKET:
+        raise S3UploadError(
+            "S3 bucket is not configured (set THUMBNAIL_S3_BUCKET in the environment)"
+        )
+    client = _s3_client()
+    return _object_read_url(client, key)
+
+
 def upload_to_s3(data: bytes, key: str) -> str:
     """Upload bytes to S3. Returns an accessible URL (direct or presigned per config)."""
     if not config.THUMBNAIL_S3_BUCKET:
@@ -66,16 +92,4 @@ def upload_to_s3(data: bytes, key: str) -> str:
             f"{config.THUMBNAIL_S3_BUCKET!r}: {exc}"
         ) from exc
 
-    if config.THUMBNAIL_S3_USE_PRESIGNED_URL:
-        try:
-            return client.generate_presigned_url(
-                "get_object",
-                Params={"Bucket": config.THUMBNAIL_S3_BUCKET, "Key": key},
-                ExpiresIn=config.THUMBNAIL_S3_PRESIGNED_EXPIRES_SECONDS,
-            )
-        except (ClientError, BotoCoreError) as exc:
-            raise S3UploadError(
-                f"S3 presigned URL generation failed for key {key!r}: {exc}"
-            ) from exc
-
-    return _direct_url(key)
+    return _object_read_url(client, key)

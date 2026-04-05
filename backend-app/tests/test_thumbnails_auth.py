@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -9,13 +10,19 @@ from httpx import AsyncClient
 
 pytestmark = pytest.mark.anyio
 
-_THUMB_BODY = {
-    "reference_image_url": "https://example.com/r.jpg",
-    "base_image_urls": ["https://example.com/b.jpg"],
-    "title": "T",
-    "include_title": True,
-    "creative_comments": "c",
-    "model": "gptimage",
+_PNG = b"\x89PNG\r\n\x1a\n"
+
+_THUMB_CREATE_KWARGS: dict[str, Any] = {
+    "files": [
+        ("reference_image", ("ref.png", _PNG, "image/png")),
+        ("base_images", ("b.png", _PNG, "image/png")),
+    ],
+    "data": {
+        "title": "T",
+        "include_title": "true",
+        "creative_comments": "c",
+        "model": "gptimage",
+    },
 }
 
 
@@ -41,6 +48,14 @@ def stub_celery(monkeypatch: pytest.MonkeyPatch) -> None:
         "app.worker.thumbnail.generate.generate_thumbnail_task.delay",
         MagicMock(),
     )
+
+
+@pytest.fixture
+def stub_s3_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _fake(_data: bytes, key: str) -> str:
+        return f"https://fake-s3.invalid/{key}"
+
+    monkeypatch.setattr("app.services.thumbnail_service.upload_to_s3", _fake)
 
 
 async def _login(client: AsyncClient, email: str, password: str) -> dict[str, str]:
@@ -75,7 +90,7 @@ async def _create_member(
 @pytest.mark.parametrize(
     "method,path,kwargs",
     [
-        ("post", "/api/v1/thumbnails", {"json": _THUMB_BODY}),
+        ("post", "/api/v1/thumbnails", _THUMB_CREATE_KWARGS),
         ("get", "/api/v1/thumbnails", {}),
         ("get", "/api/v1/thumbnails/00000000-0000-4000-8000-000000000001", {}),
         (
@@ -105,12 +120,17 @@ async def test_cross_user_get_thumbnail_forbidden(
     client: AsyncClient,
     mongo_memory: dict[str, dict],
     stub_celery: None,
+    stub_s3_upload: None,
 ) -> None:
     adm = await _admin_headers(client)
     h_a = await _create_member(client, adm, "owner@test.com", "pass1")
     h_b = await _create_member(client, adm, "other@test.com", "pass2")
 
-    cr = await client.post("/api/v1/thumbnails", json=_THUMB_BODY, headers=h_a)
+    cr = await client.post(
+        "/api/v1/thumbnails",
+        headers=h_a,
+        **_THUMB_CREATE_KWARGS,
+    )
     assert cr.status_code == 200, cr.text
     job_id = cr.json()["id"]
 
@@ -132,13 +152,18 @@ async def test_owner_can_read_thumbnail(
     client: AsyncClient,
     mongo_memory: dict[str, dict],
     stub_celery: None,
+    stub_s3_upload: None,
 ) -> None:
     adm = await _admin_headers(client)
     h = await _create_member(client, adm, "solo@test.com", "solo")
-    cr = await client.post("/api/v1/thumbnails", json=_THUMB_BODY, headers=h)
+    cr = await client.post(
+        "/api/v1/thumbnails",
+        headers=h,
+        **_THUMB_CREATE_KWARGS,
+    )
     job_id = cr.json()["id"]
+    expected_ref = f"https://fake-s3.invalid/thumbnail-inputs/{job_id}/reference.png"
     gr = await client.get(f"/api/v1/thumbnails/{job_id}", headers=h)
     assert gr.status_code == 200
     assert gr.json()["id"] == job_id
-    assert gr.json()["reference_image_url"] == _THUMB_BODY["reference_image_url"]
-
+    assert gr.json()["reference_image_url"] == expected_ref

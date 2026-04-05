@@ -8,7 +8,11 @@ import pytest
 from botocore.exceptions import ClientError
 
 from app.core.config import config
-from app.services.s3_upload import S3UploadError, upload_to_s3
+from app.services.s3_upload import (
+    S3UploadError,
+    get_s3_object_read_url,
+    upload_to_s3,
+)
 
 
 @pytest.fixture
@@ -74,6 +78,57 @@ def test_upload_to_s3_missing_bucket() -> None:
 
 
 @patch("app.services.s3_upload._s3_client")
+def test_get_s3_object_read_url_direct(mock_factory: MagicMock, mock_client: MagicMock) -> None:
+    mock_factory.return_value = mock_client
+    with patch.object(config, "THUMBNAIL_S3_BUCKET", "my-bucket"):
+        with patch.object(config, "AWS_REGION", "us-east-1"):
+            with patch.object(config, "THUMBNAIL_S3_ENDPOINT_URL", None):
+                with patch.object(config, "THUMBNAIL_S3_PUBLIC_BASE_URL", None):
+                    with patch.object(config, "THUMBNAIL_S3_USE_PRESIGNED_URL", False):
+                        url = get_s3_object_read_url("thumbnails/x.png")
+    mock_client.put_object.assert_not_called()
+    assert url.startswith("https://my-bucket.s3.us-east-1.amazonaws.com/")
+
+
+@patch("app.services.s3_upload._s3_client")
+def test_get_s3_object_read_url_presigned(mock_factory: MagicMock, mock_client: MagicMock) -> None:
+    mock_factory.return_value = mock_client
+    mock_client.generate_presigned_url.return_value = "https://signed.example/get"
+    with patch.object(config, "THUMBNAIL_S3_BUCKET", "b"):
+        with patch.object(config, "THUMBNAIL_S3_USE_PRESIGNED_URL", True):
+            with patch.object(config, "THUMBNAIL_S3_PRESIGNED_EXPIRES_SECONDS", 3600):
+                url = get_s3_object_read_url("k.png")
+    mock_client.put_object.assert_not_called()
+    mock_client.generate_presigned_url.assert_called_once_with(
+        "get_object",
+        Params={"Bucket": "b", "Key": "k.png"},
+        ExpiresIn=3600,
+    )
+    assert url == "https://signed.example/get"
+
+
+def test_get_s3_object_read_url_missing_bucket() -> None:
+    with patch.object(config, "THUMBNAIL_S3_BUCKET", ""):
+        with pytest.raises(S3UploadError, match="bucket is not configured"):
+            get_s3_object_read_url("k.png")
+
+
+@patch("app.services.s3_upload._s3_client")
+def test_get_s3_object_read_url_presigned_failure(
+    mock_factory: MagicMock, mock_client: MagicMock
+) -> None:
+    mock_factory.return_value = mock_client
+    mock_client.generate_presigned_url.side_effect = ClientError(
+        {"Error": {"Code": "X", "Message": "bad"}},
+        "GetObject",
+    )
+    with patch.object(config, "THUMBNAIL_S3_BUCKET", "b"):
+        with patch.object(config, "THUMBNAIL_S3_USE_PRESIGNED_URL", True):
+            with pytest.raises(S3UploadError, match="presigned URL generation failed"):
+                get_s3_object_read_url("k.png")
+
+
+@patch("app.services.s3_upload._s3_client")
 def test_upload_presigned_failure(mock_factory: MagicMock, mock_client: MagicMock) -> None:
     mock_factory.return_value = mock_client
     mock_client.generate_presigned_url.side_effect = ClientError(
@@ -92,6 +147,28 @@ def test_thumbnail_s3_key_constant() -> None:
     jid = "550e8400-e29b-41d4-a716-446655440000"
     assert THUMBNAIL_S3_KEY_PREFIX == "thumbnails"
     assert thumbnail_s3_key(jid) == f"thumbnails/{jid}.png"
+
+
+def test_thumbnail_input_keys_and_extension() -> None:
+    from app.constants.s3_keys import (
+        THUMBNAIL_INPUTS_PREFIX,
+        input_image_extension,
+        thumbnail_input_base_key,
+        thumbnail_input_reference_key,
+    )
+
+    jid = "550e8400-e29b-41d4-a716-446655440000"
+    assert THUMBNAIL_INPUTS_PREFIX == "thumbnail-inputs"
+    assert input_image_extension("x.PNG", None) == ".png"
+    assert input_image_extension("x.jpeg", None) == ".jpg"
+    assert input_image_extension(None, "image/webp") == ".webp"
+    assert input_image_extension(None, None) == ".bin"
+    assert thumbnail_input_reference_key(jid, "ref.jpg", None) == (
+        f"{THUMBNAIL_INPUTS_PREFIX}/{jid}/reference.jpg"
+    )
+    assert thumbnail_input_base_key(jid, 0, None, "image/png") == (
+        f"{THUMBNAIL_INPUTS_PREFIX}/{jid}/base/0.png"
+    )
 
 
 @patch("app.services.thumbnail_s3.upload_to_s3")

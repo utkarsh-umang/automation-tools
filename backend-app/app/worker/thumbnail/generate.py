@@ -22,6 +22,7 @@ from app.celery_app import celery_app
 from app.core.error_reporting import capture_thumbnail_task_exhausted_retries
 from app.db.session import AsyncSessionLocal
 from app.repositories import mongo_repo, pg_repo
+from app.services.s3_upload import get_s3_object_read_url
 from app.services.thumbnail_s3 import upload_thumbnail_png
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,18 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
     if not details:
         raise ValueError(f"Thumbnail job details missing in Mongo: {job_id}")
 
+    ref_key = details.get("reference_image_s3_key")
+    if ref_key:
+        reference_image_url = get_s3_object_read_url(str(ref_key))
+    else:
+        reference_image_url = details["reference_image_url"]
+
+    base_keys_raw = details.get("base_image_s3_keys")
+    if base_keys_raw is not None:
+        base_image_urls = [get_s3_object_read_url(str(k)) for k in base_keys_raw]
+    else:
+        base_image_urls = list(details.get("base_image_urls") or [])
+
     model = details.get("model")
     if model not in ("gptimage", "nanobanana"):
         raise ValueError(f"Unsupported thumbnail model: {model!r}")
@@ -92,8 +105,8 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
     t_agent = time.perf_counter()
     result = run_thumbnail_agent(
         model=model,
-        reference_image_url=details["reference_image_url"],
-        base_image_urls=list(details["base_image_urls"]),
+        reference_image_url=reference_image_url,
+        base_image_urls=base_image_urls,
         title=details["title"],
         include_title=bool(details["include_title"]),
         creative_comments=details["creative_comments"],

@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     THUMBNAIL_S3_PUBLIC_BASE_URL: str | None = None
     THUMBNAIL_S3_USE_PRESIGNED_URL: bool = False
     THUMBNAIL_S3_PRESIGNED_EXPIRES_SECONDS: int = 3600
+    THUMBNAIL_INPUT_MAX_BYTES: int = 10 * 1024 * 1024
 
     # ── Observability (optional) ──
     SENTRY_DSN: str | None = None

@@ -104,6 +104,72 @@ async def test_async_success_pipeline_order() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_uses_s3_keys_for_agent_urls() -> None:
+    job_id = str(uuid.uuid4())
+    sess_cm, _ = _session_context_mocks()
+    ref_key = f"thumbnail-inputs/{job_id}/reference.png"
+    base_keys = [f"thumbnail-inputs/{job_id}/base/0.jpg"]
+
+    with patch("app.worker.thumbnail.generate.AsyncSessionLocal", return_value=sess_cm):
+        with patch.object(
+            gen_mod.pg_repo,
+            "get_job",
+            new_callable=AsyncMock,
+            return_value={"status": "pending", "result_url": None},
+        ):
+            with patch.object(gen_mod.pg_repo, "update_status", new_callable=AsyncMock):
+                with patch.object(
+                    gen_mod.mongo_repo,
+                    "get_details",
+                    return_value={
+                        "reference_image_url": "https://stale.invalid/old",
+                        "base_image_urls": ["https://stale.invalid/old-base"],
+                        "reference_image_s3_key": ref_key,
+                        "base_image_s3_keys": base_keys,
+                        "title": "T",
+                        "include_title": True,
+                        "creative_comments": "c",
+                        "model": "gptimage",
+                    },
+                ):
+                    with patch(
+                        "ai_agents.run_thumbnail_agent",
+                    ) as agent:
+                        agent.return_value = {
+                            "image_bytes": b"\x89PNG\r\n",
+                            "prompt_used": None,
+                        }
+                        with patch.object(
+                            gen_mod,
+                            "get_s3_object_read_url",
+                            side_effect=lambda k: f"resolved:{k}",
+                        ) as gsu:
+                            with patch.object(
+                                gen_mod, "upload_thumbnail_png", return_value="https://s3/u"
+                            ):
+                                with patch.object(
+                                    gen_mod.mongo_repo, "update_prompt_used"
+                                ) as mp:
+                                    with patch.object(
+                                        gen_mod.pg_repo,
+                                        "update_completed",
+                                        new_callable=AsyncMock,
+                                    ):
+                                        await gen_mod._async_generate_thumbnail(
+                                            job_id, time.perf_counter()
+                                        )
+                                        mp.assert_not_called()
+                                        gsu.assert_any_call(ref_key)
+                                        gsu.assert_any_call(base_keys[0])
+                                        agent.assert_called_once()
+                                        kw = agent.call_args[1]
+                                        assert kw["reference_image_url"] == f"resolved:{ref_key}"
+                                        assert kw["base_image_urls"] == [
+                                            f"resolved:{base_keys[0]}"
+                                        ]
+
+
+@pytest.mark.asyncio
 async def test_async_calls_nanobanana_model() -> None:
     job_id = str(uuid.uuid4())
     sess_cm, _ = _session_context_mocks()

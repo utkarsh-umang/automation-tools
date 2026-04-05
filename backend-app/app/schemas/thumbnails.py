@@ -9,17 +9,6 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-class ThumbnailCreateRequest(BaseModel):
-    """Create body — never includes ``created_by`` (comes from JWT)."""
-
-    reference_image_url: str
-    base_image_urls: list[str]
-    title: str
-    include_title: bool
-    creative_comments: str
-    model: Literal["gptimage", "nanobanana"]
-
-
 class ThumbnailFeedbackRequest(BaseModel):
     feedback: str
     model: Literal["gptimage", "nanobanana"]

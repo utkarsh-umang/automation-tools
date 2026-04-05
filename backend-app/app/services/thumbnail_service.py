@@ -9,16 +9,17 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants.s3_keys import thumbnail_input_base_key, thumbnail_input_reference_key
 from app.repositories import mongo_repo, pg_repo
 from app.schemas.thumbnail_job_details import ThumbnailJobDetailsPayload
 from app.schemas.thumbnails import (
-    ThumbnailCreateRequest,
     ThumbnailFeedbackRequest,
     ThumbnailHistoryResponse,
     ThumbnailJobCreatedResponse,
     ThumbnailJobPublic,
     ThumbnailListResponse,
 )
+from app.services.s3_upload import S3UploadError, upload_to_s3
 from app.services.thumbnail_access import require_thumbnail_job_owner
 
 
@@ -67,10 +68,24 @@ def _job_row_to_public(job: dict[str, Any], mongo: dict[str, Any] | None) -> Thu
 async def create_thumbnail_job(
     session: AsyncSession,
     user_id: uuid.UUID,
-    body: ThumbnailCreateRequest,
+    *,
+    reference: tuple[bytes, str | None, str | None],
+    base_images: list[tuple[bytes, str | None, str | None]],
+    title: str,
+    include_title: bool,
+    creative_comments: str,
+    model: str,
 ) -> ThumbnailJobCreatedResponse:
     """``created_by`` is always ``user_id`` from the verified JWT."""
+    if model not in ("gptimage", "nanobanana"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="model must be gptimage or nanobanana",
+        )
     job_id = uuid.uuid4()
+    jid_str = str(job_id)
+    ref_bytes, ref_fn, ref_ct = reference
+
     await pg_repo.create_job(
         session,
         job_id,
@@ -79,21 +94,39 @@ async def create_thumbnail_job(
         root_job_id=job_id,
         iteration=1,
     )
+
+    ref_key = thumbnail_input_reference_key(jid_str, ref_fn, ref_ct)
+    try:
+        ref_url = upload_to_s3(ref_bytes, ref_key)
+        base_urls: list[str] = []
+        base_keys: list[str] = []
+        for i, (bdata, bfn, bct) in enumerate(base_images):
+            bk = thumbnail_input_base_key(jid_str, i, bfn, bct)
+            base_urls.append(upload_to_s3(bdata, bk))
+            base_keys.append(bk)
+    except S3UploadError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+
     payload: ThumbnailJobDetailsPayload = {
-        "reference_image_url": body.reference_image_url,
-        "base_image_urls": body.base_image_urls,
-        "title": body.title,
-        "include_title": body.include_title,
-        "creative_comments": body.creative_comments,
-        "model": body.model,
+        "reference_image_url": ref_url,
+        "base_image_urls": base_urls,
+        "reference_image_s3_key": ref_key,
+        "base_image_s3_keys": base_keys,
+        "title": title,
+        "include_title": include_title,
+        "creative_comments": creative_comments,
+        "model": model,
         "feedback": None,
         "prompt_used": None,
         "created_at": datetime.now(UTC),
     }
-    mongo_repo.create_details(str(job_id), payload)
+    mongo_repo.create_details(jid_str, payload)
     from app.worker.thumbnail.generate import generate_thumbnail_task
 
-    generate_thumbnail_task.delay(str(job_id))
+    generate_thumbnail_task.delay(jid_str)
     return ThumbnailJobCreatedResponse(id=job_id, status="pending")
 
 
@@ -163,6 +196,13 @@ async def submit_thumbnail_feedback(
         "prompt_used": None,
         "created_at": datetime.now(UTC),
     }
+    rk = details.get("reference_image_s3_key")
+    if rk:
+        payload["reference_image_s3_key"] = str(rk)
+    bk = details.get("base_image_s3_keys")
+    if bk is not None:
+        payload["base_image_s3_keys"] = list(bk)
+
     mongo_repo.create_details(str(new_id), payload)
 
     from app.worker.thumbnail.generate import generate_thumbnail_task
