@@ -8,6 +8,7 @@ import { Login } from '@/pages/Login'
 import { BatchDetailPage } from '@/pages/youtube-script/BatchDetailPage'
 import { YouTubeScriptLayout } from '@/pages/youtube-script/YouTubeScriptLayout'
 import { YouTubeScriptTool } from '@/pages/youtube-script/YouTubeScriptTool'
+import { ThumbnailProject } from '@/pages/thumbnail-project'
 
 function App() {
   return (
@@ -62,10 +63,7 @@ function App() {
             path="/thumbnail"
             element={
               <AppShell breadcrumb="Thumbnail Project">
-                <ComingSoonScreen
-                  title="Thumbnail Project"
-                  description="Thumbnail concepts and batch exports for short-form content."
-                />
+                <ThumbnailProject />
               </AppShell>
             }
           />
