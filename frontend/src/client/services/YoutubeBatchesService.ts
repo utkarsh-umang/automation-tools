@@ -3,6 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { BatchCreateRequest } from '../models/BatchCreateRequest';
+import type { ResetTermToPendingResponse } from '../models/ResetTermToPendingResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -100,6 +101,51 @@ export class YoutubeBatchesService {
             url: '/api/v1/youtube/batches/{batch_id}/trigger',
             path: {
                 'batch_id': batchId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Finalize Batch
+     * Deduplicate leads and mark batch as finalized.
+     * @param batchId
+     * @returns any Successful Response
+     * @throws ApiError
+     */
+    public static finalizeBatchApiV1YoutubeBatchesBatchIdFinalizePost(
+        batchId: string,
+    ): CancelablePromise<Record<string, any>> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/youtube/batches/{batch_id}/finalize',
+            path: {
+                'batch_id': batchId,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Reset Term To Pending
+     * Clear a failed or running term back to pending, remove its leads, re-queue batch, try to dispatch.
+     * @param batchId
+     * @param termId
+     * @returns ResetTermToPendingResponse Successful Response
+     * @throws ApiError
+     */
+    public static resetTermToPendingApiV1YoutubeBatchesBatchIdTermsTermIdResetToPendingPost(
+        batchId: string,
+        termId: string,
+    ): CancelablePromise<ResetTermToPendingResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/youtube/batches/{batch_id}/terms/{term_id}/reset-to-pending',
+            path: {
+                'batch_id': batchId,
+                'term_id': termId,
             },
             errors: {
                 422: `Validation Error`,
