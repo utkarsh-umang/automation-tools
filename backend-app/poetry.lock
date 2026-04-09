@@ -24,7 +24,7 @@ python-dotenv = "*"
 type = "git"
 url = "https://github.com/utkarsh-umang/ai-agents-service.git"
 reference = "HEAD"
-resolved_reference = "dde05fca449ac084c10b95700a6d28c4743622ce"
+resolved_reference = "9e4c163e7baa6bda313f4642115a3f360e55f58a"
 
 [[package]]
 name = "alembic"
