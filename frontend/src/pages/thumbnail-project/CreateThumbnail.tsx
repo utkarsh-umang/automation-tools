@@ -1,7 +1,7 @@
 import Uppy from '@uppy/core'
-import Dashboard from '@uppy/react/dashboard'
+import DashboardPlugin from '@uppy/dashboard'
 import { ChevronDown } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getApiErrorMessage,
   useCreateThumbnailMutation,
@@ -28,49 +28,56 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
   const [model, setModel] = useState<(typeof MODEL_OPTIONS)[number]['value']>('gptimage')
   const [formError, setFormError] = useState<string | null>(null)
 
-  const referenceUppy = useMemo(
-    () =>
-      new Uppy({
-        id: 'thumbnail-reference',
-        restrictions: {
-          maxNumberOfFiles: 1,
-          maxFileSize: MAX_BYTES,
-          allowedFileTypes: ['image/*'],
-        },
-      }),
-    [],
-  )
-
-  const baseUppy = useMemo(
-    () =>
-      new Uppy({
-        id: 'thumbnail-base',
-        restrictions: {
-          maxNumberOfFiles: 20,
-          maxFileSize: MAX_BYTES,
-          allowedFileTypes: ['image/*'],
-        },
-      }),
-    [],
-  )
+  const referenceContainerRef = useRef<HTMLDivElement>(null)
+  const baseContainerRef = useRef<HTMLDivElement>(null)
+  // Uppy instances are created in useEffect (after DOM is painted) so the ResizeObserver
+  // always starts on a fully laid-out element, preventing the blank-Dashboard flash.
+  const referenceUppyRef = useRef<Uppy | null>(null)
+  const baseUppyRef = useRef<Uppy | null>(null)
 
   useEffect(() => {
-    return () => {
-      referenceUppy.destroy()
-    }
-  }, [referenceUppy])
+    const refUppy = new Uppy({
+      id: 'thumbnail-reference',
+      restrictions: { maxNumberOfFiles: 1, maxFileSize: MAX_BYTES, allowedFileTypes: ['image/*'] },
+    })
+    refUppy.use(DashboardPlugin, {
+      id: 'ReferenceDashboard',
+      target: referenceContainerRef.current!,
+      inline: true,
+      height: 260,
+      proudlyDisplayPoweredByUppy: false,
+    })
+    referenceUppyRef.current = refUppy
 
-  useEffect(() => {
+    const baseUppy = new Uppy({
+      id: 'thumbnail-base',
+      restrictions: { maxNumberOfFiles: 20, maxFileSize: MAX_BYTES, allowedFileTypes: ['image/*'] },
+    })
+    baseUppy.use(DashboardPlugin, {
+      id: 'BaseDashboard',
+      target: baseContainerRef.current!,
+      inline: true,
+      height: 260,
+      proudlyDisplayPoweredByUppy: false,
+    })
+    baseUppyRef.current = baseUppy
+
     return () => {
+      refUppy.destroy()
       baseUppy.destroy()
+      referenceUppyRef.current = null
+      baseUppyRef.current = null
     }
-  }, [baseUppy])
+  }, [])
 
   const createMutation = useCreateThumbnailMutation()
 
   async function handleGenerate() {
     setFormError(null)
-    const refFiles = referenceUppy.getFiles()
+    const refUppy = referenceUppyRef.current
+    const baseUppy = baseUppyRef.current
+
+    const refFiles = refUppy?.getFiles() ?? []
     const ref = refFiles[0]
     if (!ref) {
       setFormError('Add a reference image (style guide).')
@@ -81,8 +88,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
       return
     }
 
-    const baseFiles = baseUppy.getFiles()
-    const baseBlobs = baseFiles.map((f) => f.data as Blob)
+    const baseBlobs = (baseUppy?.getFiles() ?? []).map((f) => f.data as Blob)
 
     try {
       await createMutation.mutateAsync({
@@ -93,8 +99,8 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
         creative_comments: creativeComments,
         model,
       })
-      referenceUppy.cancelAll()
-      baseUppy.cancelAll()
+      refUppy?.cancelAll()
+      baseUppy?.cancelAll()
       setTitle('')
       setCreativeComments('')
       onCreated?.()
@@ -237,7 +243,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
               className="rounded-lg overflow-hidden border border-dashed"
               style={{ borderColor: '#d1d5db', minHeight: 260 }}
             >
-              <Dashboard uppy={referenceUppy} height={260} proudlyDisplayPoweredByUppy={false} />
+              <div ref={referenceContainerRef} />
             </div>
             <p className="mt-1 text-xs" style={{ color: '#6b7280' }}>
               One image, PNG/JPG/WebP up to 10MB.
@@ -251,7 +257,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
               className="rounded-lg overflow-hidden border border-dashed"
               style={{ borderColor: '#d1d5db', minHeight: 260 }}
             >
-              <Dashboard uppy={baseUppy} height={260} proudlyDisplayPoweredByUppy={false} />
+              <div ref={baseContainerRef} />
             </div>
             <p className="mt-1 text-xs" style={{ color: '#6b7280' }}>
               Optional. Multiple images allowed; transparent PNG recommended.
