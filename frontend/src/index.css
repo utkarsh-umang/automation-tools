@@ -55,3 +55,8 @@
 body {
   margin: 0;
 }
+
+/* Uppy Dashboard: fill available height and center "Drop files here" vertically */
+.uppy-Dashboard-AddFiles {
+  flex-direction: row;
+}
