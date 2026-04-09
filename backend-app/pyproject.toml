@@ -32,6 +32,7 @@ pandas = "^2.0"
 ai-agents-service = { git = "https://github.com/utkarsh-umang/ai-agents-service.git" }
 boto3 = "^1.42.0"
 sentry-sdk = {version = "^2.19.0", optional = true}
+sqlalchemy = ">=2.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
