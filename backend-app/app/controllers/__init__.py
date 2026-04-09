@@ -3,7 +3,7 @@
 from fastapi import APIRouter
 
 from app.controllers.auth import router as auth_router
-from app.controllers.thumbnails import router as thumbnails_router
+from app.controllers.thumbnail_creator import thumbnail_creator_router as thumbnails_router
 from app.controllers.users import router as users_router
 from app.controllers.youtube import youtube_router
 
