@@ -64,7 +64,7 @@ export function ThumbnailProject() {
       </div>
 
       <div className="space-y-4">
-        {tab === 'list' ? <YourThumbnails /> : <CreateThumbnail />}
+        {tab === 'list' ? <YourThumbnails /> : <CreateThumbnail onCreated={() => setTab('list')} />}
       </div>
     </div>
   )
