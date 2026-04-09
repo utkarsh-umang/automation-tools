@@ -51,12 +51,19 @@ services:
       dockerfile: Dockerfile.celery
     restart: unless-stopped
     environment:
+      # Override host .env: inside the container localhost is not Postgres (use service name + internal port).
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       MONGO_LOCAL_URI: mongodb://mongo:27017
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
     env_file:
       - .env
     depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
       redis:
         condition: service_healthy
 

@@ -46,6 +46,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
       inline: true,
       height: 260,
       proudlyDisplayPoweredByUppy: false,
+      hideUploadButton: true,
     })
     referenceUppyRef.current = refUppy
 
@@ -59,6 +60,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
       inline: true,
       height: 260,
       proudlyDisplayPoweredByUppy: false,
+      hideUploadButton: true,
     })
     baseUppyRef.current = baseUppy
 

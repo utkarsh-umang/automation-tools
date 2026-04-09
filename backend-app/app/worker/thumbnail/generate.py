@@ -20,7 +20,7 @@ from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
 
 from app.celery_app import celery_app
 from app.core.error_reporting import capture_thumbnail_task_exhausted_retries
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, engine
 from app.repositories import mongo_repo, pg_repo
 from app.services.s3_upload import get_s3_object_read_url
 from app.services.thumbnail_s3 import upload_thumbnail_png
@@ -43,11 +43,28 @@ async def _mark_pg_failed(job_id: uuid.UUID, message: str) -> None:
 
 
 def _run_mark_pg_failed(job_id_str: str, message: str) -> None:
-    asyncio.run(_mark_pg_failed(uuid.UUID(job_id_str), message))
+    _run_async_pg(_mark_pg_failed(uuid.UUID(job_id_str), message))
 
 
 def _failure_log_message(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {_truncate_error_message(exc)}"
+
+
+def _run_async_pg(coro):
+    """Run async DB work; dispose the engine so pools are not reused across event loops.
+
+    Each Celery task uses ``asyncio.run``, which creates a new loop. asyncpg
+    connections are bound to the loop that created them; reusing the global
+    engine pool across loops triggers "another operation is in progress".
+    """
+
+    async def _runner() -> None:
+        try:
+            await coro
+        finally:
+            await engine.dispose(close=True)
+
+    asyncio.run(_runner())
 
 
 async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
@@ -166,7 +183,7 @@ def generate_thumbnail_task(self, job_id: str) -> None:
     """Background thumbnail generation; sole argument ``job_id`` (UUID string)."""
     t0 = time.perf_counter()
     try:
-        asyncio.run(_async_generate_thumbnail(job_id, t0))
+        _run_async_pg(_async_generate_thumbnail(job_id, t0))
     except SoftTimeLimitExceeded:
         logger.error(
             "thumbnail.generate event=task_failed_soft_timeout job_id=%s",
