@@ -81,11 +81,17 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       MONGO_LOCAL_URI: mongodb://mongo:27017
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
     env_file:
       - .env
     volumes:
       - ./url-to-email-445616-cebe4868914f.json:/app/url-to-email-445616-cebe4868914f.json:ro
     depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
       redis:
         condition: service_healthy
       backend:

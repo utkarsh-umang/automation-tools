@@ -65,6 +65,9 @@ def _create_thumb_multipart() -> dict[str, Any]:
 _DUMMY_S3_URL = "https://integration-test.invalid/out.png"
 _DUMMY_PROMPT = "dummy-prompt-used"
 
+# Must match ``thumbnail_creator_router`` mount: /api/v1/thumbnails + /thumbnail
+_THUMB_BASE = "/api/v1/thumbnails/thumbnail"
+
 
 async def _run_thumbnail_pipeline(job_id: str) -> None:
     """Run the same async pipeline as the Celery task (shared event loop as FastAPI tests)."""
@@ -190,7 +193,7 @@ async def test_full_job_lifecycle_happy_path(
     member_h = await _member_headers(client, admin_h)
 
     r = await client.post(
-        "/api/v1/thumbnails",
+        _THUMB_BASE,
         headers=member_h,
         **_create_thumb_multipart(),
     )
@@ -239,7 +242,7 @@ async def test_feedback_lineage_and_merged_comments(
     member_h = await _member_headers(client, admin_h)
 
     cr = await client.post(
-        "/api/v1/thumbnails",
+        _THUMB_BASE,
         headers=member_h,
         **_create_thumb_multipart(),
     )
@@ -254,7 +257,7 @@ async def test_feedback_lineage_and_merged_comments(
 
     capture_celery_delay.clear()
     fr = await client.post(
-        f"/api/v1/thumbnails/{job1}/feedback",
+        f"{_THUMB_BASE}/{job1}/feedback",
         json={"feedback": "round-two", "model": "gptimage"},
         headers=member_h,
     )
@@ -282,7 +285,7 @@ async def test_feedback_lineage_and_merged_comments(
 
     capture_celery_delay.clear()
     fr2 = await client.post(
-        f"/api/v1/thumbnails/{job2}/feedback",
+        f"{_THUMB_BASE}/{job2}/feedback",
         json={"feedback": "round-three", "model": "gptimage"},
         headers=member_h,
     )

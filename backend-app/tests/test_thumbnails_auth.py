@@ -10,6 +10,9 @@ from httpx import AsyncClient
 
 pytestmark = pytest.mark.anyio
 
+# Must match ``thumbnail_creator_router`` mount: /api/v1/thumbnails + /thumbnail
+_THUMB_BASE = "/api/v1/thumbnails/thumbnail"
+
 _PNG = b"\x89PNG\r\n\x1a\n"
 
 _THUMB_CREATE_KWARGS: dict[str, Any] = {
@@ -90,17 +93,17 @@ async def _create_member(
 @pytest.mark.parametrize(
     "method,path,kwargs",
     [
-        ("post", "/api/v1/thumbnails", _THUMB_CREATE_KWARGS),
-        ("get", "/api/v1/thumbnails", {}),
-        ("get", "/api/v1/thumbnails/00000000-0000-4000-8000-000000000001", {}),
+        ("post", _THUMB_BASE, _THUMB_CREATE_KWARGS),
+        ("get", _THUMB_BASE, {}),
+        ("get", f"{_THUMB_BASE}/00000000-0000-4000-8000-000000000001", {}),
         (
             "post",
-            "/api/v1/thumbnails/00000000-0000-4000-8000-000000000001/feedback",
+            f"{_THUMB_BASE}/00000000-0000-4000-8000-000000000001/feedback",
             {"json": {"feedback": "x", "model": "gptimage"}},
         ),
         (
             "get",
-            "/api/v1/thumbnails/00000000-0000-4000-8000-000000000001/history",
+            f"{_THUMB_BASE}/00000000-0000-4000-8000-000000000001/history",
             {},
         ),
     ],
@@ -127,24 +130,24 @@ async def test_cross_user_get_thumbnail_forbidden(
     h_b = await _create_member(client, adm, "other@test.com", "pass2")
 
     cr = await client.post(
-        "/api/v1/thumbnails",
+        _THUMB_BASE,
         headers=h_a,
         **_THUMB_CREATE_KWARGS,
     )
     assert cr.status_code == 200, cr.text
     job_id = cr.json()["id"]
 
-    gr = await client.get(f"/api/v1/thumbnails/{job_id}", headers=h_b)
+    gr = await client.get(f"{_THUMB_BASE}/{job_id}", headers=h_b)
     assert gr.status_code == 403
 
     fr = await client.post(
-        f"/api/v1/thumbnails/{job_id}/feedback",
+        f"{_THUMB_BASE}/{job_id}/feedback",
         json={"feedback": "more", "model": "gptimage"},
         headers=h_b,
     )
     assert fr.status_code == 403
 
-    hr = await client.get(f"/api/v1/thumbnails/{job_id}/history", headers=h_b)
+    hr = await client.get(f"{_THUMB_BASE}/{job_id}/history", headers=h_b)
     assert hr.status_code == 403
 
 
@@ -157,13 +160,13 @@ async def test_owner_can_read_thumbnail(
     adm = await _admin_headers(client)
     h = await _create_member(client, adm, "solo@test.com", "solo")
     cr = await client.post(
-        "/api/v1/thumbnails",
+        _THUMB_BASE,
         headers=h,
         **_THUMB_CREATE_KWARGS,
     )
     job_id = cr.json()["id"]
     expected_ref = f"https://fake-s3.invalid/thumbnail-inputs/{job_id}/reference.png"
-    gr = await client.get(f"/api/v1/thumbnails/{job_id}", headers=h)
+    gr = await client.get(f"{_THUMB_BASE}/{job_id}", headers=h)
     assert gr.status_code == 200
     assert gr.json()["id"] == job_id
     assert gr.json()["reference_image_url"] == expected_ref
