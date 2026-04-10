@@ -69,96 +69,93 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#0f1f4a]/60 backdrop-blur-md p-4 sm:p-8 animate-in fade-in duration-200">
       <div className="bg-white rounded-[2rem] shadow-2xl max-w-5xl w-full flex min-h-0 flex-col md:flex-row overflow-hidden max-h-[90vh] ring-1 ring-white/20">
-        <div className="relative flex w-full min-h-[200px] flex-col bg-[#0a0f1e] md:min-h-0 md:max-h-[90vh] md:w-[60%]">
+        {/* Left panel — fixed-height thumbnail + scrollable accordion below */}
+        <div className="relative flex w-full flex-col bg-[#0a0f1e] md:w-[60%] md:overflow-y-auto">
           <div
             className="pointer-events-none absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.8)_0%,transparent_100%)]"
             aria-hidden
           />
-          <div
-            className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-6 py-6 sm:px-8 sm:py-8 md:px-10 md:py-10"
-            style={{ WebkitOverflowScrolling: 'touch' }}
-          >
-            <div className="flex flex-col items-center justify-center min-h-[min(40vh,220px)] py-2">
-              {isLoading && (
-                <Loader2 className="w-10 h-10 text-blue-400 animate-spin" aria-label="Loading" />
-              )}
-              {isError && (
-                <p className="text-white text-sm text-center px-4">
-                  {getApiErrorMessage(error)}{' '}
-                  <button type="button" className="underline" onClick={() => void refetch()}>
-                    Retry
-                  </button>
-                </p>
-              )}
-              {!isLoading && !isError && job?.result_url && (
-                <img
-                  src={job.result_url}
-                  alt="Generated thumbnail"
-                  className="rounded-2xl shadow-2xl ring-1 ring-white/10 max-h-[min(48vh,440px)] w-full max-w-full object-contain"
-                />
-              )}
-              {!isLoading && !isError && job && !job.result_url && (
-                <div className="text-center text-gray-300 text-sm px-6">
-                  <p className="font-semibold text-white mb-1">{job.status}</p>
-                  {job.error && <p className="text-red-300">{job.error}</p>}
-                  {!job.error && <p>No image yet. This job may still be processing.</p>}
-                </div>
-              )}
-            </div>
 
-            {!isLoading && !isError && job && (job.reference_image_url || (job.base_image_urls?.length ?? 0) > 0) && (
-              <details className="group mt-6 w-full shrink-0 rounded-2xl border border-white/15 bg-white/[0.06] backdrop-blur-sm">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-semibold text-gray-100 transition-colors hover:bg-white/[0.06] [&::-webkit-details-marker]:hidden">
+          {/* Generated image — fixed height, never shrinks */}
+          <div className="relative z-10 flex h-[min(46vh,400px)] shrink-0 items-center justify-center px-8 py-8">
+            {isLoading && (
+              <Loader2 className="w-10 h-10 text-blue-400 animate-spin" aria-label="Loading" />
+            )}
+            {isError && (
+              <p className="text-white text-sm text-center px-4">
+                {getApiErrorMessage(error)}{' '}
+                <button type="button" className="underline" onClick={() => void refetch()}>
+                  Retry
+                </button>
+              </p>
+            )}
+            {!isLoading && !isError && job?.result_url && (
+              <img
+                src={job.result_url}
+                alt="Generated thumbnail"
+                className="h-full w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10"
+              />
+            )}
+            {!isLoading && !isError && job && !job.result_url && (
+              <div className="text-center text-gray-300 text-sm px-6">
+                <p className="font-semibold text-white mb-1">{job.status}</p>
+                {job.error && <p className="text-red-300">{job.error}</p>}
+                {!job.error && <p>No image yet. This job may still be processing.</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Source images accordion — lives below the thumbnail, column scrolls to reveal */}
+          {!isLoading && !isError && job && (job.reference_image_url || (job.base_image_urls?.length ?? 0) > 0) && (
+            <div className="relative z-10 shrink-0 border-t border-white/10 px-6 pb-6 pt-0 sm:px-8 sm:pb-8">
+              <details className="group rounded-2xl border border-white/15 bg-white/6 backdrop-blur-sm">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-semibold text-gray-100 transition-colors hover:bg-white/6 [&::-webkit-details-marker]:hidden">
                   <span className="flex items-center gap-2.5">
                     <Images className="h-4 w-4 shrink-0 text-blue-300" aria-hidden />
                     Source images
-                    <span className="text-xs font-normal text-gray-500">
-                      (reference &amp; base)
-                    </span>
+                    <span className="text-xs font-normal text-gray-500">(reference &amp; base)</span>
                   </span>
                   <ChevronDown
                     className="h-5 w-5 shrink-0 text-gray-400 transition-transform duration-200 group-open:rotate-180"
                     aria-hidden
                   />
                 </summary>
-                <div className="max-h-[min(52vh,420px)] overflow-y-auto overscroll-contain border-t border-white/10 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
-                  <div className="space-y-6 pr-1">
-                    {job.reference_image_url && (
-                      <div>
-                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                          Reference
-                        </p>
-                        <img
-                          src={job.reference_image_url}
-                          alt="Reference"
-                          className="max-h-48 w-auto max-w-full rounded-xl object-contain ring-1 ring-white/10"
-                          loading="lazy"
-                        />
+                <div className="space-y-6 border-t border-white/10 px-4 pb-5 pt-4 sm:px-5 sm:pb-6">
+                  {job.reference_image_url && (
+                    <div>
+                      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                        Reference
+                      </p>
+                      <img
+                        src={job.reference_image_url}
+                        alt="Reference"
+                        className="max-h-52 w-auto max-w-full rounded-xl object-contain ring-1 ring-white/10"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+                  {job.base_image_urls && job.base_image_urls.length > 0 && (
+                    <div>
+                      <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                        Base images
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {job.base_image_urls.map((url, i) => (
+                          <img
+                            key={`${url}-${i}`}
+                            src={url}
+                            alt={`Base ${i + 1}`}
+                            className="h-32 w-auto max-w-[calc(50%-0.375rem)] rounded-lg object-cover ring-1 ring-white/10 sm:max-w-[calc(33.333%-0.5rem)]"
+                            loading="lazy"
+                          />
+                        ))}
                       </div>
-                    )}
-                    {job.base_image_urls && job.base_image_urls.length > 0 && (
-                      <div>
-                        <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
-                          Base images
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                          {job.base_image_urls.map((url, i) => (
-                            <img
-                              key={`${url}-${i}`}
-                              src={url}
-                              alt={`Base ${i + 1}`}
-                              className="h-32 w-auto max-w-[calc(50%-0.375rem)] rounded-lg object-cover ring-1 ring-white/10 sm:max-w-[calc(33.333%-0.5rem)]"
-                              loading="lazy"
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               </details>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div className="flex min-h-0 w-full flex-col overflow-y-auto p-8 md:w-[40%] md:max-h-[90vh] md:p-10">
