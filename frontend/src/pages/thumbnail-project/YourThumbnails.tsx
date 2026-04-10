@@ -1,4 +1,3 @@
-import { Filter } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { ThumbnailJobPublic } from '@/client'
 import { useThumbnailListInfiniteQuery } from '@/hooks/api/useThumbnailApi'
@@ -57,25 +56,6 @@ export function YourThumbnails() {
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold" style={{ color: '#111827' }}>
-          Recent thumbnails
-        </h2>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors"
-          style={{ borderColor: '#e5e7eb', color: '#374151', backgroundColor: '#ffffff' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#f9fafb'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff'
-          }}
-        >
-          <Filter className="w-3.5 h-3.5" /> Filter
-        </button>
-      </div>
-
       {isLoading && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
