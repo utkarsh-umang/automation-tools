@@ -45,6 +45,21 @@ def get_details(job_id: str, *, db_name: str | None = None) -> dict[str, Any] | 
     return _collection(db_name).find_one({"job_id": job_id})
 
 
+def get_details_many(
+    job_ids: list[str], *, db_name: str | None = None
+) -> dict[str, dict[str, Any]]:
+    """Return ``job_id`` → document for all matching jobs (empty map if ``job_ids`` empty)."""
+    if not job_ids:
+        return {}
+    coll = _collection(db_name)
+    out: dict[str, dict[str, Any]] = {}
+    for doc in coll.find({"job_id": {"$in": job_ids}}):
+        jid = doc.get("job_id")
+        if jid is not None:
+            out[str(jid)] = doc
+    return out
+
+
 def update_prompt_used(
     job_id: str, prompt_used: str, *, db_name: str | None = None
 ) -> None:
@@ -59,5 +74,6 @@ __all__ = [
     "create_details",
     "ensure_thumbnail_job_details_indexes",
     "get_details",
+    "get_details_many",
     "update_prompt_used",
 ]

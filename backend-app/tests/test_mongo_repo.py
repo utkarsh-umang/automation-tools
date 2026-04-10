@@ -31,6 +31,28 @@ def test_create_details_inserts(mock_coll_fn: MagicMock) -> None:
 
 
 @patch("app.repositories.mongo_repo._collection")
+def test_get_details_many(mock_coll_fn: MagicMock) -> None:
+    coll = MagicMock()
+    coll.find.return_value = [
+        {"job_id": "a", "title": "one"},
+        {"job_id": "b", "title": "two"},
+    ]
+    mock_coll_fn.return_value = coll
+    out = mongo_repo.get_details_many(["a", "b"])
+    assert out == {
+        "a": {"job_id": "a", "title": "one"},
+        "b": {"job_id": "b", "title": "two"},
+    }
+    coll.find.assert_called_once_with({"job_id": {"$in": ["a", "b"]}})
+
+
+@patch("app.repositories.mongo_repo._collection")
+def test_get_details_many_empty_ids(mock_coll_fn: MagicMock) -> None:
+    assert mongo_repo.get_details_many([]) == {}
+    mock_coll_fn.assert_not_called()
+
+
+@patch("app.repositories.mongo_repo._collection")
 def test_get_details(mock_coll_fn: MagicMock) -> None:
     coll = MagicMock()
     coll.find_one.return_value = {"job_id": "x", "title": "y"}

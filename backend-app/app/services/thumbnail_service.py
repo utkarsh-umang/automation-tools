@@ -137,7 +137,9 @@ async def list_thumbnail_jobs(
     limit: int,
 ) -> ThumbnailListResponse:
     rows = await pg_repo.list_jobs_by_user(session, user_id, cursor, limit)
-    jobs = [_job_row_to_public(r, None) for r in rows]
+    job_ids = [str(r["id"]) for r in rows]
+    mongo_by_id = mongo_repo.get_details_many(job_ids)
+    jobs = [_job_row_to_public(r, mongo_by_id.get(str(r["id"]))) for r in rows]
     next_cursor: uuid.UUID | None = None
     if rows and len(rows) == limit:
         next_cursor = _as_uuid(rows[-1]["id"])
