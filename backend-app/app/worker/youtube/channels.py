@@ -5,7 +5,7 @@ Ported from youtube_script.py:
   - get_recent_videos()
   - get_video_stats()
 
-Each function accepts api_key and counter as explicit args.
+Each function accepts :class:`YouTubeQuotaContext` for key selection and credits.
 Credit cost: 1 credit per API call (channels, playlistItems, videos).
 """
 
@@ -14,7 +14,7 @@ import time
 
 import requests
 
-from app.worker.youtube.credits import CreditCounter
+from app.worker.youtube.quota_context import YouTubeQuotaContext
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,7 @@ VIDEO_CREDIT_COST = 1
 
 def get_channel_details_batch(
     channel_ids: list[str],
-    api_key: str,
-    counter: CreditCounter,
+    quota: YouTubeQuotaContext,
 ) -> list[dict]:
     """Fetch full channel details (statistics, snippet, contentDetails) in batches of 50.
 
@@ -39,6 +38,7 @@ def get_channel_details_batch(
 
     for i in range(0, len(channel_ids), CHANNEL_BATCH_SIZE):
         batch = channel_ids[i : i + CHANNEL_BATCH_SIZE]
+        api_key, counter = quota.prepare_for_charge(CHANNEL_CREDIT_COST)
         params = {
             "part": "statistics,contentDetails,snippet",
             "id": ",".join(batch),
@@ -60,14 +60,14 @@ def get_channel_details_batch(
 
 def get_recent_videos(
     playlist_id: str,
-    api_key: str,
-    counter: CreditCounter,
+    quota: YouTubeQuotaContext,
     max_results: int = 15,
 ) -> list[dict]:
     """Fetch the most recent uploads from a channel's uploads playlist.
 
     Cost: 1 credit per call.
     """
+    api_key, counter = quota.prepare_for_charge(PLAYLIST_CREDIT_COST)
     params = {
         "part": "snippet",
         "playlistId": playlist_id,
@@ -86,8 +86,7 @@ def get_recent_videos(
 
 def get_video_stats(
     video_ids: list[str],
-    api_key: str,
-    counter: CreditCounter,
+    quota: YouTubeQuotaContext,
 ) -> list[dict]:
     """Fetch statistics for a list of video IDs (up to 50).
 
@@ -96,6 +95,7 @@ def get_video_stats(
     if not video_ids:
         return []
 
+    api_key, counter = quota.prepare_for_charge(VIDEO_CREDIT_COST)
     params = {
         "part": "statistics",
         "id": ",".join(video_ids[:50]),

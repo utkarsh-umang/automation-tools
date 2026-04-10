@@ -1,6 +1,6 @@
 """Celery task: process a single search term.
 
-process_term(batch_id, term_id, credit_key) performs the full pipeline
+process_term(batch_id, term_id, date_iso) performs the full pipeline
 for one search term:
   1. Mark term running
   2. collect_channel_ids → channel ID pool
@@ -20,6 +20,7 @@ from datetime import datetime
 from app.cache.redis_client import get_raw_redis
 from app.celery_app import celery_app
 from app.core.config import config
+from app.core.youtube_keys import get_ordered_youtube_api_keys
 from app.repositories.youtube import (
     batch_repo,
     job_log_repo,
@@ -27,24 +28,34 @@ from app.repositories.youtube import (
     search_term_repo,
 )
 from app.worker.youtube.channels import get_channel_details_batch
-from app.worker.youtube.credits import CreditCounter, CreditLimitExceeded
+from app.worker.youtube.credits import CreditLimitExceeded
 from app.worker.youtube.evaluate import evaluate_channel
+from app.worker.youtube.quota_context import YouTubeQuotaContext
 from app.worker.youtube.search import collect_channel_ids
 
 logger = logging.getLogger(__name__)
 
 
 @celery_app.task(name="youtube.process_term", bind=True)
-def process_term(self, batch_id: str, term_id: str, credit_key: str) -> int:
+def process_term(self, batch_id: str, term_id: str, date_iso: str) -> int:
     """Process a single search term end-to-end.
 
     Returns the number of credits used during this task (delta from
-    before the call).  The orchestrator persists this to daily_usage.
+    before the call), summed across all API keys.  The orchestrator
+    persists this to daily_usage.
     """
     redis_client = get_raw_redis()
-    counter = CreditCounter(redis_client, credit_key)  # uses existing Redis value
+    api_keys = get_ordered_youtube_api_keys()
+    quota = YouTubeQuotaContext(
+        redis_client,
+        date_iso,
+        api_keys,
+        config.YOUTUBE_DAILY_CREDIT_LIMIT,
+        batch_id=batch_id,
+        term_id=term_id,
+    )
 
-    credits_before = counter.total()
+    credits_before = quota.total_all()
 
     term_doc = search_term_repo.get_by_id(term_id)
     if term_doc is None:
@@ -56,7 +67,6 @@ def process_term(self, batch_id: str, term_id: str, credit_key: str) -> int:
 
     filters = batch_doc.get("filters", {})
     keyword = term_doc["term"]
-    api_key = config.YOUTUBE_API_KEY_V3
 
     search_term_repo.mark_running(term_id)
     job_log_repo.append(batch_id, "term_started", f"Processing term: {keyword}", term_id)
@@ -65,9 +75,7 @@ def process_term(self, batch_id: str, term_id: str, credit_key: str) -> int:
         # ── Step 1: collect channel IDs ────────────────────────────────
         channel_ids = collect_channel_ids(
             keyword=keyword,
-            api_key=api_key,
-            counter=counter,
-            credit_limit=config.YOUTUBE_DAILY_CREDIT_LIMIT,
+            quota=quota,
             region=filters.get("region", "US"),
         )
         channels_discovered = len(channel_ids)
@@ -76,14 +84,14 @@ def process_term(self, batch_id: str, term_id: str, credit_key: str) -> int:
         )
 
         # ── Step 2: fetch channel details ─────────────────────────────
-        channels_data = get_channel_details_batch(channel_ids, api_key, counter)
+        channels_data = get_channel_details_batch(channel_ids, quota)
 
         # ── Step 3: evaluate and accumulate leads ─────────────────────
         leads: list[dict] = []
         emails_found = 0
 
         for channel in channels_data:
-            lead = evaluate_channel(channel, filters, api_key, counter)
+            lead = evaluate_channel(channel, filters, quota)
             if lead is None:
                 continue
             lead["batchId"] = batch_id
@@ -99,7 +107,7 @@ def process_term(self, batch_id: str, term_id: str, credit_key: str) -> int:
         lead_repo.insert_many(leads)
 
         # ── Step 5: mark term done ────────────────────────────────────
-        credits_used = counter.total() - credits_before
+        credits_used = quota.total_all() - credits_before
         search_term_repo.mark_done(
             term_id,
             credits_used=credits_used,

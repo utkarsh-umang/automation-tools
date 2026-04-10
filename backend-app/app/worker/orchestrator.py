@@ -7,8 +7,8 @@ run_batch(batch_id) manages the batch state machine:
 Key behaviours:
   - Redis distributed lock prevents double-trigger (key: batch_lock:{batch_id})
   - One-batch-per-day enforced via daily_usage.activeBatchId
-  - Credit counter initialised from persisted daily_usage at run start
-  - Terms processed sequentially; credit limit hit → term rolled back, batch paused
+  - Per-key credit counters initialised from persisted daily_usage at run start
+  - Terms processed sequentially; credit limit hit on last key → term rolled back, batch paused
   - Single term failure does not stop the batch (logs error, moves on)
   - Lock always released in finally block
 """
@@ -20,6 +20,7 @@ from zoneinfo import ZoneInfo
 from app.cache.redis_client import get_raw_redis
 from app.celery_app import celery_app
 from app.core.config import config
+from app.core.youtube_keys import get_ordered_youtube_api_keys
 from app.repositories.youtube import (
     batch_repo,
     daily_usage_repo,
@@ -28,7 +29,12 @@ from app.repositories.youtube import (
 )
 from app.schemas.youtube.batch import BatchStatus
 from app.worker.process_term import process_term
-from app.worker.youtube.credits import CreditCounter, CreditLimitExceeded
+from app.worker.youtube.credits import CreditLimitExceeded
+from app.worker.youtube.quota_context import (
+    aggregate_from_redis,
+    all_keys_exhausted,
+    seed_redis_from_mongo,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,10 +61,22 @@ def run_batch(self, batch_id: str) -> None:
         logger.info("run_batch: lock released for batch %s", batch_id)
 
 
+def _normalise_credits_by_key(usage: dict, num_keys: int) -> dict[str, int]:
+    """Build per-key seed from Mongo; migrate legacy single ``creditsUsed`` to key 0."""
+    raw = usage.get("creditsByKey")
+    if isinstance(raw, dict) and raw:
+        return {str(i): int(raw.get(str(i), 0)) for i in range(num_keys)}
+    legacy = int(usage.get("creditsUsed") or 0)
+    return {str(i): (legacy if i == 0 else 0) for i in range(num_keys)}
+
+
 def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
     """Inner run logic (separated from the lock boilerplate for clarity)."""
     today = datetime.now(PACIFIC_TZ).date().isoformat()
-    credit_key = f"yt_credits:{today}"
+
+    api_keys = get_ordered_youtube_api_keys()
+    n_keys = len(api_keys)
+    per_limit = config.YOUTUBE_DAILY_CREDIT_LIMIT
 
     # ── Check batch is in a triggerable state ─────────────────────────
     batch = batch_repo.get_by_id(batch_id)
@@ -90,29 +108,29 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
         )
         return
 
-    # ── Initialise credit counter from today's persisted usage ────────
-    credits_at_start = usage.get("creditsUsed", 0)
-    counter = CreditCounter(redis_client, credit_key, initial=credits_at_start)
+    # ── Initialise per-key Redis counters from persisted usage ────────
+    credits_by_key = _normalise_credits_by_key(usage, n_keys)
+    seed_redis_from_mongo(redis_client, today, n_keys, credits_by_key)
+    credits_at_start, _ = aggregate_from_redis(redis_client, today, n_keys)
 
-    # Immediately check whether we are already over limit
-    if counter.over_limit(config.YOUTUBE_DAILY_CREDIT_LIMIT):
-        logger.info("run_batch: daily credit limit already reached, pausing batch %s", batch_id)
+    if all_keys_exhausted(redis_client, today, n_keys, per_limit):
+        logger.info("run_batch: daily credit limit already reached on all keys, pausing batch %s", batch_id)
         batch_repo.update_status(batch_id, BatchStatus.PAUSED)
-        job_log_repo.append(batch_id, "run_paused", "Daily credit limit already reached")
+        job_log_repo.append(batch_id, "run_paused", "Daily credit limit already reached (all keys)")
         return
 
     # ── Mark batch running ────────────────────────────────────────────
     batch_repo.update_status(
         batch_id,
         BatchStatus.RUNNING,
-        last_triggered_at=__import__("datetime").datetime.utcnow(),
+        last_triggered_at=datetime.utcnow(),
     )
     daily_usage_repo.set_active_batch(batch_id)
 
     job_log_repo.append(
         batch_id,
         "run_started",
-        f"Batch run started. Credits at start: {credits_at_start}",
+        f"Batch run started. Credits at start (all keys): {credits_at_start}",
     )
 
     # ── Process pending terms sequentially ───────────────────────────
@@ -120,7 +138,7 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
 
     if not pending_terms:
         logger.info("run_batch: no pending terms for batch %s", batch_id)
-        _finalise(batch_id, counter, credits_at_start)
+        _finalise(batch_id, redis_client, today, n_keys, credits_at_start)
         return
 
     credit_limit_hit = False
@@ -129,10 +147,9 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
         term_id = term_doc["_id"]
         keyword = term_doc.get("term", "")
 
-        # Pre-term credit check
-        if counter.over_limit(config.YOUTUBE_DAILY_CREDIT_LIMIT):
+        if all_keys_exhausted(redis_client, today, n_keys, per_limit):
             logger.info(
-                "run_batch: credit limit reached before term %s (%r), pausing",
+                "run_batch: credit limit reached on all keys before term %s (%r), pausing",
                 term_id,
                 keyword,
             )
@@ -140,7 +157,7 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
             break
 
         try:
-            process_term.apply(args=[batch_id, term_id, credit_key])
+            process_term.apply(args=[batch_id, term_id, today])
         except CreditLimitExceeded:
             logger.info(
                 "run_batch: credit limit hit mid-term %s (%r), rolling back to pending",
@@ -148,7 +165,6 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
                 keyword,
             )
             search_term_repo.reset_to_pending(term_id)
-            batch_repo.increment_processed_terms.__doc__  # noop — do NOT increment for rolled-back term
             credit_limit_hit = True
             break
         except Exception as exc:
@@ -157,11 +173,11 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
             )
             # Mark is already done by process_term; continue to next term
 
-        # Persist credit total to MongoDB after each term
-        daily_usage_repo.set_credits_used(counter.total())
+        total, by_key = aggregate_from_redis(redis_client, today, n_keys)
+        daily_usage_repo.set_credits_used_and_by_key(total, by_key)
 
-    # Final credit persist
-    daily_usage_repo.set_credits_used(counter.total())
+    total, by_key = aggregate_from_redis(redis_client, today, n_keys)
+    daily_usage_repo.set_credits_used_and_by_key(total, by_key)
 
     if credit_limit_hit:
         batch_repo.update_status(batch_id, BatchStatus.PAUSED)
@@ -169,24 +185,28 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
         job_log_repo.append(
             batch_id,
             "run_paused",
-            f"Daily credit limit reached. Credits used: {counter.total()}",
+            f"Daily credit limit reached (last key). Credits used: {total}",
         )
         logger.info(
             "run_batch: batch %s paused (credit limit). Total credits: %d",
             batch_id,
-            counter.total(),
+            total,
         )
         return
 
-    _finalise(batch_id, counter, credits_at_start)
+    _finalise(batch_id, redis_client, today, n_keys, credits_at_start)
 
 
-def _finalise(batch_id: str, counter: CreditCounter, credits_at_start: int) -> None:
+def _finalise(
+    batch_id: str,
+    redis_client,
+    today: str,
+    n_keys: int,
+    credits_at_start: int,
+) -> None:
     """Determine final batch status after all terms are processed."""
     terms = search_term_repo.get_all_for_batch(batch_id)
     statuses = {t["status"] for t in terms}
-
-    from datetime import datetime
 
     if not statuses or statuses == {"done"}:
         batch_repo.update_status(
@@ -206,14 +226,15 @@ def _finalise(batch_id: str, counter: CreditCounter, credits_at_start: int) -> N
     daily_usage_repo.clear_active_batch()
     daily_usage_repo.increment_runs()
 
-    credits_this_run = counter.total() - credits_at_start
+    total, _by = aggregate_from_redis(redis_client, today, n_keys)
+    credits_this_run = total - credits_at_start
     job_log_repo.append(
         batch_id,
         "run_completed",
         (
             f"Batch {status_label}. "
             f"Credits this run: {credits_this_run}. "
-            f"Total today: {counter.total()}"
+            f"Total today: {total}"
         ),
     )
     logger.info(
@@ -221,5 +242,5 @@ def _finalise(batch_id: str, counter: CreditCounter, credits_at_start: int) -> N
         batch_id,
         status_label,
         credits_this_run,
-        counter.total(),
+        total,
     )

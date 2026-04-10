@@ -25,6 +25,7 @@ def get_or_create_today() -> dict:
             "$setOnInsert": {
                 "date": today,
                 "creditsUsed": 0,
+                "creditsByKey": {},
                 "creditLimit": 10000,
                 "activeBatchId": None,
                 "runsCompleted": 0,
@@ -52,6 +53,15 @@ def set_credits_used(value: int) -> None:
         COLLECTION,
         {"date": _today()},
         {"$set": {"creditsUsed": value}},
+    )
+
+
+def set_credits_used_and_by_key(total: int, credits_by_key: dict[str, int]) -> None:
+    """Persist aggregate daily credits and per-key breakdown."""
+    update_document(
+        COLLECTION,
+        {"date": _today()},
+        {"$set": {"creditsUsed": total, "creditsByKey": credits_by_key}},
     )
 
 

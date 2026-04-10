@@ -9,6 +9,7 @@ class DailyUsageDocument(BaseModel):
     id: str | None = Field(default=None, alias="_id")
     date: str  # "YYYY-MM-DD"
     creditsUsed: int = 0
+    creditsByKey: dict[str, int] = Field(default_factory=dict)
     creditLimit: int = 10000
     activeBatchId: str | None = None
     runsCompleted: int = 0

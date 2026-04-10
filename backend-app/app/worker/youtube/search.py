@@ -2,7 +2,7 @@
 
 Ported from youtube_script.py — collect_channel_ids().
 Global variables replaced with explicit parameters; credit tracking
-injected via CreditCounter.
+injected via YouTubeQuotaContext.
 """
 
 import logging
@@ -10,7 +10,7 @@ import time
 
 import requests
 
-from app.worker.youtube.credits import CreditCounter, CreditLimitExceeded
+from app.worker.youtube.quota_context import YouTubeQuotaContext
 
 logger = logging.getLogger(__name__)
 
@@ -25,16 +25,14 @@ BASE_URL = "https://www.googleapis.com/youtube/v3"
 
 def collect_channel_ids(
     keyword: str,
-    api_key: str,
-    counter: CreditCounter,
-    credit_limit: int,
+    quota: YouTubeQuotaContext,
     region: str = "US",
     relevance_language: str = "en",
 ) -> list[str]:
     """Search YouTube for channels matching keyword across 3 sort orders.
 
     Stops early on low yield or when TARGET_CHANNEL_POOL is reached.
-    Raises CreditLimitExceeded if the daily quota is hit mid-search.
+    Raises CreditLimitExceeded if the daily quota is hit on the last key mid-search.
 
     Returns a list of unique channel IDs.
     """
@@ -48,12 +46,7 @@ def collect_channel_ids(
         pages_per_order = MAX_SEARCH_PAGES // len(SEARCH_ORDERS)
 
         for page in range(pages_per_order):
-            # Check limit BEFORE making the call
-            if counter.over_limit(credit_limit):
-                raise CreditLimitExceeded(
-                    f"Credit limit {credit_limit} reached before page {page + 1} "
-                    f"(order={order})"
-                )
+            api_key, counter = quota.prepare_for_charge(SEARCH_CREDIT_COST)
 
             params: dict = {
                 "part": "snippet",

@@ -49,6 +49,7 @@ class Settings(BaseSettings):
 
     # ── YouTube ──
     YOUTUBE_API_KEY_V3: str = ""
+    YOUTUBE_API_KEY_V3_2: str = ""
     YOUTUBE_DAILY_CREDIT_LIMIT: int = 10000
 
     # ── GCP (optional) ──

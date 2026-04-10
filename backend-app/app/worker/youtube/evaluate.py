@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 
 from app.schemas.youtube.lead import EmailStatus
 from app.worker.youtube.channels import get_recent_videos, get_video_stats
-from app.worker.youtube.credits import CreditCounter
+from app.worker.youtube.credits import CreditLimitExceeded
+from app.worker.youtube.quota_context import YouTubeQuotaContext
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,7 @@ def extract_emails(text: str) -> list[str]:
 def evaluate_channel(
     channel: dict,
     filters: dict,
-    api_key: str,
-    counter: CreditCounter,
+    quota: YouTubeQuotaContext,
 ) -> dict | None:
     """Evaluate a single channel against the batch's filter criteria.
 
@@ -65,7 +65,7 @@ def evaluate_channel(
         if not uploads_playlist:
             return None
 
-        videos = get_recent_videos(uploads_playlist, api_key, counter)
+        videos = get_recent_videos(uploads_playlist, quota)
 
         cutoff = datetime.utcnow() - timedelta(days=30)
         recent_count = 0
@@ -94,7 +94,7 @@ def evaluate_channel(
         if recent_count < min_uploads:
             return None
 
-        stats = get_video_stats(video_ids[:20], api_key, counter)
+        stats = get_video_stats(video_ids[:20], quota)
         views = [int(v.get("statistics", {}).get("viewCount", 0)) for v in stats]
         avg_views = sum(views) / len(views) if views else 0
 
@@ -136,6 +136,8 @@ def evaluate_channel(
             "emailStatus": email_status.value,
         }
 
+    except CreditLimitExceeded:
+        raise
     except Exception as exc:
         logger.warning("evaluate_channel error for channel %s: %s", channel.get("id"), exc)
         return None

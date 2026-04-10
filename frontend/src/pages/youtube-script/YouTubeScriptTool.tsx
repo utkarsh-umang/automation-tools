@@ -121,6 +121,7 @@ export function YouTubeScriptTool() {
                 creditUsagePercent={credits.limit > 0 ? (credits.used / credits.limit) * 100 : 0}
                 dailyCreditLimit={credits.limit}
                 resetAt={credits.resetAt}
+                keys={credits.keys}
               />
             ) : (
               <div className="rounded-xl border px-4 py-4 text-sm" style={{ borderColor: '#e5e7eb' }}>

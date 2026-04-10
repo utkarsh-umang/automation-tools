@@ -29,12 +29,22 @@ export interface BatchDetail extends BatchItem {
   terms: SearchTermItem[]
 }
 
+export interface CreditKeyUsage {
+  id: string
+  label: string
+  used: number
+  limit: number
+  remaining: number
+}
+
 export interface CreditsToday {
   used: number
   remaining: number
   limit: number
   activeBatchId: string | null
   resetAt: string
+  /** Present when one or more YouTube API keys are configured */
+  keys?: CreditKeyUsage[]
 }
 
 export interface LeadItem {

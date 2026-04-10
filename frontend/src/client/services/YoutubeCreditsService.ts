@@ -12,6 +12,9 @@ export class YoutubeCreditsService {
      *
      * Returns a zeroed response (not 404) if no usage has been recorded yet.
      * resetAt is midnight Pacific Time of the following day.
+     *
+     * ``keys`` lists per-key usage when multiple keys are configured; raw API key
+     * strings are never returned.
      * @returns any Successful Response
      * @throws ApiError
      */

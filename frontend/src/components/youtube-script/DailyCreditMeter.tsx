@@ -1,11 +1,21 @@
 import { useEffect, useState } from 'react'
 
+export interface CreditKeyRow {
+  id: string
+  label: string
+  used: number
+  limit: number
+  remaining: number
+}
+
 interface DailyCreditMeterProps {
   dailyCreditsUsed: number
   creditsRemaining: number
   creditUsagePercent: number
   dailyCreditLimit: number
   resetAt?: string
+  /** Per-API-key usage when multiple keys are configured */
+  keys?: CreditKeyRow[]
 }
 
 export function DailyCreditMeter({
@@ -14,6 +24,7 @@ export function DailyCreditMeter({
   creditUsagePercent,
   dailyCreditLimit,
   resetAt,
+  keys = [],
 }: DailyCreditMeterProps) {
   const highUsage = creditUsagePercent >= 80
   const barColor = highUsage ? '#f59e0b' : '#2563eb'
@@ -52,7 +63,7 @@ export function DailyCreditMeter({
             YouTube API credits (today)
           </p>
           <p className="mt-0.5 text-xs" style={{ color: '#6b7280' }}>
-            Resets daily · {dailyCreditLimit.toLocaleString()} credit limit
+            Resets daily · {dailyCreditLimit.toLocaleString()} credit limit (all keys)
           </p>
           {resetCountdownLabel && (
             <p className="mt-0.5 text-xs font-medium" style={{ color: '#2563eb' }}>
@@ -82,6 +93,40 @@ export function DailyCreditMeter({
           }}
         />
       </div>
+
+      {keys.length > 0 && (
+        <div className="mt-4 space-y-2 border-t pt-3" style={{ borderColor: '#f3f4f6' }}>
+          <p className="text-xs font-medium" style={{ color: '#6b7280' }}>
+            Per key
+          </p>
+          {keys.map((k) => {
+            const pct = k.limit > 0 ? Math.min(100, (k.used / k.limit) * 100) : 0
+            const rowHigh = pct >= 80
+            return (
+              <div key={k.id}>
+                <div className="mb-1 flex justify-between text-xs">
+                  <span style={{ color: '#374151' }}>{k.label}</span>
+                  <span style={{ color: '#6b7280' }}>
+                    {k.used.toLocaleString()} / {k.limit.toLocaleString()} ({k.remaining.toLocaleString()} left)
+                  </span>
+                </div>
+                <div
+                  className="h-1.5 w-full overflow-hidden rounded-full"
+                  style={{ backgroundColor: '#f3f4f6' }}
+                >
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{
+                      width: `${pct}%`,
+                      backgroundColor: rowHigh ? '#f59e0b' : '#93c5fd',
+                    }}
+                  />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
