@@ -32,6 +32,15 @@ export const tools: ToolDefinition[] = [
     iconId: 'image',
   },
   {
+    id: 'podscan',
+    label: 'Podscan Collab List',
+    path: '/podscan',
+    status: 'live',
+    description: 'Build a Podscan-style collab list from a YouTube channel for outreach (sheet + CSV export).',
+    tags: ['Podcasts', 'Leads', 'Podscan'],
+    iconId: 'list',
+  },
+  {
     id: 'library-lp',
     label: 'Library LP Creator',
     path: '/library-lp',
@@ -39,15 +48,6 @@ export const tools: ToolDefinition[] = [
     description: 'Generate landing pages from your content library templates.',
     tags: ['Landing pages', 'Content'],
     iconId: 'book',
-  },
-  {
-    id: 'podscan',
-    label: 'Podscan List',
-    path: '/podscan',
-    status: 'soon',
-    description: 'Build podcast lead lists from targeted scans.',
-    tags: ['Podcasts', 'Leads'],
-    iconId: 'list',
   },
   {
     id: 'lead-magnet-pdf',

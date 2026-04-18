@@ -8,6 +8,7 @@ import { Login } from '@/pages/Login'
 import { BatchDetailPage } from '@/pages/youtube-script/BatchDetailPage'
 import { YouTubeScriptLayout } from '@/pages/youtube-script/YouTubeScriptLayout'
 import { YouTubeScriptTool } from '@/pages/youtube-script/YouTubeScriptTool'
+import { PodcastCollabListCreator, PodcastCollabListCreatorTableView } from '@/pages/podcast-collab-list'
 import { ThumbnailProject } from '@/pages/thumbnail-project'
 
 function App() {
@@ -27,6 +28,19 @@ function App() {
           </Route>
 
           <Route
+            path="/podscan"
+            element={
+              <AppShell breadcrumb="Podcast Collab List Creator">
+                <PodcastCollabListCreator />
+              </AppShell>
+            }
+          />
+          <Route
+            path="/podscan/:id"
+            element={<PodcastCollabListCreatorTableView />}
+          />
+
+          <Route
             path="/library-lp"
             element={
               <AppShell breadcrumb="Library LP Creator">
@@ -37,17 +51,7 @@ function App() {
               </AppShell>
             }
           />
-          <Route
-            path="/podscan"
-            element={
-              <AppShell breadcrumb="Podscan List">
-                <ComingSoonScreen
-                  title="Podscan List Builder"
-                  description="Build podcast lead lists from targeted scans."
-                />
-              </AppShell>
-            }
-          />
+
           <Route
             path="/lead-magnet-pdf"
             element={
