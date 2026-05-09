@@ -157,7 +157,10 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
             break
 
         try:
-            process_term.apply(args=[batch_id, term_id, today])
+            # Run term processing inline to guarantee exception propagation.
+            # Using Celery's Task.apply() can return a failure result without raising,
+            # which breaks the credit-limit pause/rollback behavior.
+            process_term(batch_id, term_id, today)
         except CreditLimitExceeded:
             logger.info(
                 "run_batch: credit limit hit mid-term %s (%r), rolling back to pending",
@@ -208,7 +211,13 @@ def _finalise(
     terms = search_term_repo.get_all_for_batch(batch_id)
     statuses = {t["status"] for t in terms}
 
-    if not statuses or statuses == {"done"}:
+    # If any term remains pending/running, the batch is not complete.
+    # This protects against early termination (crash/timeout/quota stop)
+    # leaving terms incomplete, and prevents incorrectly marking a batch as completed.
+    if "pending" in statuses or "running" in statuses:
+        batch_repo.update_status(batch_id, BatchStatus.PAUSED)
+        status_label = "paused (incomplete terms remain)"
+    elif not statuses or statuses == {"done"}:
         batch_repo.update_status(
             batch_id, BatchStatus.COMPLETED, completed_at=datetime.utcnow()
         )

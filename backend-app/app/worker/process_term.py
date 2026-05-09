@@ -137,7 +137,16 @@ def process_term(self, batch_id: str, term_id: str, date_iso: str) -> int:
         return credits_used
 
     except CreditLimitExceeded:
-        # Orchestrator handles rollback — just re-raise
+        # Quota can be exhausted after we marked the term running. Roll the term back
+        # so it can be resumed on the next day's run, then re-raise for the orchestrator
+        # to pause the batch.
+        search_term_repo.reset_to_pending(term_id)
+        job_log_repo.append(
+            batch_id,
+            "term_paused_quota",
+            f"Term '{keyword}' paused: daily credit limit reached",
+            term_id,
+        )
         raise
 
     except Exception as exc:
