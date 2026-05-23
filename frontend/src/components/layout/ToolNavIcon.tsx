@@ -54,5 +54,12 @@ export function ToolNavIcon({ id }: { id: ToolIconId }) {
           />
         </svg>
       )
+    case 'chart':
+      return (
+        <svg {...common}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3v18h18" />
+          <path strokeLinecap="round" strokeLinejoin="round" d="M18 9l-5 5-4-4-5 5" />
+        </svg>
+      )
   }
 }

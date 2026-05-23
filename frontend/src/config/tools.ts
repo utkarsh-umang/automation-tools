@@ -1,6 +1,6 @@
 export type ToolNavStatus = 'live' | 'soon'
 
-export type ToolIconId = 'youtube' | 'book' | 'list' | 'pdf' | 'image'
+export type ToolIconId = 'youtube' | 'book' | 'list' | 'pdf' | 'image' | 'chart'
 
 export interface ToolDefinition {
   id: string
@@ -30,6 +30,15 @@ export const tools: ToolDefinition[] = [
     description: 'Thumbnail concepts and batch exports for short-form.',
     tags: ['Thumbnails', 'Creative'],
     iconId: 'image',
+  },
+  {
+    id: 'hooks-analyzer',
+    label: 'Hooks Analyzer',
+    path: '/hooks-analyzer',
+    status: 'live',
+    description: 'Deploy high-performance analysis on video hooks to maximize retention.',
+    tags: ['Hooks', 'Analysis'],
+    iconId: 'chart',
   },
   {
     id: 'podscan',
