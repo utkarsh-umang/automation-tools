@@ -371,7 +371,7 @@ export function HooksAnalyzer() {
             </div>
             <h1 className="text-3xl font-bold text-slate-900">Viral Clip Recommendations</h1>
             <p className="mt-2 max-w-2xl text-sm text-slate-500">
-              AI-powered extraction based on emotional triggers, retention probability, and platform trends.
+              We found 5 high-performing hooks from this 1-hour podcast. AI-powered extraction based on emotional triggers, retention probability, and platform trends.
             </p>
           </div>
           <button 
@@ -390,7 +390,7 @@ export function HooksAnalyzer() {
             </div>
             <div>
               <p className="text-xs font-semibold text-slate-500">Clips Identified</p>
-              <p className="text-lg font-bold text-slate-900">03 Results</p>
+              <p className="text-lg font-bold text-slate-900">05 Results</p>
             </div>
           </div>
           <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -433,6 +433,24 @@ export function HooksAnalyzer() {
               badgeColor: 'bg-slate-100 text-slate-600',
               duration: '21:05 - 22:20',
               why: 'Promises a specific actionable solution to a problem established earlier. This provides immense standalone value, ideal for saving/bookmarking behavior on social platforms.',
+            },
+            {
+              id: 4,
+              title: 'The Turning Point Story',
+              probability: '88%',
+              badge: 'STORYTELLING',
+              badgeColor: 'bg-blue-100 text-blue-700',
+              duration: '35:10 - 36:40',
+              why: 'Highly relatable personal anecdote. Vulnerability early in the clip builds strong para-social connection, leading to a much higher completion rate and shares.',
+            },
+            {
+              id: 5,
+              title: 'The Controversial Opinion',
+              probability: '91%',
+              badge: 'HIGH ENGAGEMENT',
+              badgeColor: 'bg-orange-100 text-orange-700',
+              duration: '48:30 - 49:55',
+              why: 'Polarizing statement that naturally drives comments and debate. This segment plays perfectly into algorithm metrics for boosting organic reach through user interaction.',
             }
           ].map((hook) => (
             <div key={hook.id} className="flex flex-col rounded-xl bg-white p-6 shadow-sm border border-slate-200 transition-all hover:border-blue-200 hover:shadow-md">
