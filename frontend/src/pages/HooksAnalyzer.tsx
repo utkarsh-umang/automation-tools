@@ -143,12 +143,6 @@ export function HooksAnalyzer() {
 
     return (
       <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="font-bold text-slate-900">Recent Completed Batches</h3>
-          <button className="text-sm font-semibold text-blue-600 hover:text-blue-700">
-            View All History
-          </button>
-        </div>
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm text-slate-600">
@@ -225,23 +219,7 @@ export function HooksAnalyzer() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           {/* Transcript Content */}
           <div className="col-span-1 flex flex-col rounded-xl bg-white shadow-sm border border-slate-200 lg:col-span-2 overflow-hidden h-fit">
-            <div className="flex items-center justify-between border-b border-slate-100 p-4">
-              <div className="flex items-center gap-6">
-                <button className="flex items-center gap-2 text-sm font-semibold text-blue-600">
-                  <Edit3 className="h-4 w-4" /> Edit Text
-                </button>
-                <button className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700">
-                  <SpellCheck className="h-4 w-4" /> Auto-Correct
-                </button>
-              </div>
-              <div className="flex items-center gap-3 text-sm font-semibold text-slate-500">
-                Confidence Score: 98%
-                <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
-                  <div className="h-full w-[98%] bg-emerald-500"></div>
-                </div>
-              </div>
-            </div>
-            
+
             <div className="flex-1 p-6 text-sm text-slate-700 leading-relaxed overflow-y-auto max-h-[500px]">
               <div className="mb-6 flex gap-4">
                 <span className="shrink-0 font-mono text-blue-400 font-semibold">[00:00:00]</span>
@@ -492,6 +470,24 @@ export function HooksAnalyzer() {
       {view === 'loading' && renderLoading()}
       
       <div className="mx-auto max-w-6xl p-6 lg:p-8">
+        {view !== 'initial' && (
+          <div className="mb-6 border-b border-slate-200 pb-4">
+            <button 
+              onClick={() => setView(view === 'transcript-view' ? 'results' : 'initial')}
+              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800"
+            >
+              {view === 'transcript-view' ? (
+                <>
+                  <ArrowLeft className="h-4 w-4" /> Back to Results
+                </>
+              ) : (
+                <>
+                  <ArrowLeft className="h-4 w-4" /> Back to Dashboard
+                </>
+              )}
+            </button>
+          </div>
+        )}
         {view === 'initial' && (
           <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
@@ -527,24 +523,6 @@ export function HooksAnalyzer() {
         {(view === 'transcript' || view === 'transcript-view') && renderTranscript()}
         {view === 'results' && renderResults()}
 
-        {view !== 'initial' && (
-          <div className="mt-8 border-t border-slate-200 pt-6">
-            <button 
-              onClick={() => setView(view === 'results' || view === 'transcript-view' ? 'results' : 'initial')}
-              className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-slate-800"
-            >
-              {view === 'transcript-view' ? (
-                <>
-                  <ArrowLeft className="h-4 w-4" /> Back to Results
-                </>
-              ) : (
-                <>
-                  <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-                </>
-              )}
-            </button>
-          </div>
-        )}
       </div>
     </>
   )
