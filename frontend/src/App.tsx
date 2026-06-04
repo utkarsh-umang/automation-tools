@@ -10,6 +10,7 @@ import { YouTubeScriptLayout } from '@/pages/youtube-script/YouTubeScriptLayout'
 import { YouTubeScriptTool } from '@/pages/youtube-script/YouTubeScriptTool'
 import { PodcastCollabListCreator, PodcastCollabListCreatorTableView } from '@/pages/podcast-collab-list'
 import { ThumbnailProject } from '@/pages/thumbnail-project'
+import { HooksAnalyzer } from '@/pages/HooksAnalyzer'
 
 function App() {
   return (
@@ -26,6 +27,8 @@ function App() {
             <Route index element={<YouTubeScriptTool />} />
             <Route path="batch/:batchId" element={<BatchDetailPage />} />
           </Route>
+
+          <Route path="/hooks-analyzer" element={<AppShell><HooksAnalyzer /></AppShell>} />
 
           <Route
             path="/podscan"
