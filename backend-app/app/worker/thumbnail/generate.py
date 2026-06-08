@@ -25,8 +25,6 @@ from app.repositories import mongo_repo, pg_repo
 from app.services.s3_upload import get_s3_object_read_url
 from app.services.thumbnail_s3 import upload_thumbnail_png
 
-from ai_agents import run_thumbnail_agent
-
 logger = logging.getLogger(__name__)
 
 _MAX_PG_ERROR_LEN = 500
@@ -118,6 +116,8 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         job_id,
         model,
     )
+
+    from ai_agents import run_thumbnail_agent  # deferred: requires OPENAI_API_KEY at call time
 
     t_agent = time.perf_counter()
     result = run_thumbnail_agent(

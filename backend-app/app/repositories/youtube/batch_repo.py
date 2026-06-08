@@ -94,6 +94,18 @@ def decrement_processed_terms(batch_id: str, n: int = 1) -> None:
     )
 
 
+def list_eligible_for_trigger() -> list[dict]:
+    """Return QUEUED and PAUSED batches sorted oldest-first (for scheduler)."""
+    result = fetch_from_collection_with_options(
+        COLLECTION,
+        query={"status": {"$in": [BatchStatus.QUEUED.value, BatchStatus.PAUSED.value]}},
+        sort=[("createdAt", 1)],
+    )
+    if not result.success:
+        return []
+    return result.data or []
+
+
 def delete(batch_id: str) -> None:
     """Hard-delete a batch document."""
     delete_document(COLLECTION, {"_id": ObjectId(batch_id)})
