@@ -67,6 +67,28 @@ services:
       redis:
         condition: service_healthy
 
+  celery-beat:
+    build:
+      context: ./backend-app
+      dockerfile: Dockerfile.celery
+    command: celery -A app.celery_app beat --loglevel=info --pidfile=/tmp/celerybeat.pid --schedule=/tmp/celerybeat-schedule
+    restart: unless-stopped
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      MONGO_LOCAL_URI: mongodb://mongo:27017
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   flower:
     image: mher/flower:2.0
     restart: unless-stopped

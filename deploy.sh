@@ -40,9 +40,9 @@ deploy_backend() {
 
     sync_compose
 
-    log "Restarting backend + celery-worker on VM..."
+    log "Restarting backend + celery-worker + celery-beat on VM..."
     gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
-        "cd ${VM_DIR} && docker compose -f ${COMPOSE_FILE} pull backend celery-worker && docker compose -f ${COMPOSE_FILE} up -d backend celery-worker"
+        "cd ${VM_DIR} && docker compose -f ${COMPOSE_FILE} pull backend celery-worker celery-beat && docker compose -f ${COMPOSE_FILE} up -d backend celery-worker celery-beat"
 
     success "Backend deployed"
 }
