@@ -18,16 +18,22 @@ picked up again (oldest-first) on the next day's post-reset cycle and continues.
 Duplicate-trigger safety: the orchestrator holds a Redis lock per batch and
 enforces activeBatchId in daily_usage — this task only schedules; the
 orchestrator rejects any race conditions.
+
+Watchdog: each cycle first reaps a stale active batch (one whose worker died
+mid-run, leaving activeBatchId set with no live run lock), so a crash/redeploy
+can't deadlock the queue until the Pacific-midnight rollover.
 """
 
 import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from app.cache.redis_client import get_raw_redis
 from app.celery_app import celery_app
 from app.core.config import config
 from app.core.youtube_keys import configured_youtube_key_count
 from app.repositories.youtube import batch_repo, daily_usage_repo, job_log_repo
+from app.schemas.youtube.batch import BatchStatus
 from app.worker.orchestrator import run_batch
 
 logger = logging.getLogger(__name__)
@@ -67,6 +73,42 @@ def _credits_remaining() -> int:
     return max(0, total_limit - credits_used)
 
 
+def _reap_stale_active_batch() -> None:
+    """Recover from a worker that died mid-run (watchdog).
+
+    If ``activeBatchId`` is set but the batch's run lock (``batch_lock:{id}``) is
+    gone, the orchestrator is no longer running it — the worker crashed or was
+    redeployed between marking the batch RUNNING and finalising it. Without this,
+    ``activeBatchId`` would stay set (Guard 2 below) and block every auto-trigger
+    until the Pacific-midnight daily_usage rollover — a ~23h queue deadlock.
+
+    The orchestrator renews the lock after every term, so a live lock means a run
+    is genuinely in progress and we leave it alone. A missing lock means the run
+    is orphaned: reset the batch to PAUSED (so it re-queues) and clear the flag.
+    """
+    usage = daily_usage_repo.get_today()
+    active = (usage or {}).get("activeBatchId")
+    if not active:
+        return
+
+    if get_raw_redis().get(f"batch_lock:{active}") is not None:
+        return  # lock alive → a run is really in progress; not stale
+
+    logger.warning(
+        "auto_trigger_worker: active batch %s has no run lock — worker died mid-run; recovering",
+        active,
+    )
+    batch = batch_repo.get_by_id(active)
+    if batch and batch.get("status") == BatchStatus.RUNNING.value:
+        batch_repo.update_status(active, BatchStatus.PAUSED)
+        job_log_repo.append(
+            active,
+            "run_reaped",
+            "Auto-recovered by watchdog: worker died mid-run; batch reset to PAUSED for retry.",
+        )
+    daily_usage_repo.clear_active_batch()
+
+
 def _dispatch(batch: dict, trigger_source: str) -> None:
     """Log and enqueue a batch run."""
     batch_id = str(batch["_id"])
@@ -100,6 +142,9 @@ def _dispatch(batch: dict, trigger_source: str) -> None:
 @celery_app.task(name="youtube.auto_trigger_worker", bind=True)
 def auto_trigger_batch_worker(self) -> None:  # noqa: ANN001
     """Hourly (1 AM–11 PM PT): advance the batch queue by one batch per cycle."""
+
+    # --- Watchdog: recover a batch orphaned by a dead worker ---
+    _reap_stale_active_batch()
 
     # --- Guard 1: credits exhausted ---
     if not _credits_available():
