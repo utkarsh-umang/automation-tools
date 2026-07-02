@@ -3,8 +3,11 @@
 from functools import lru_cache
 from typing import Any
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_SECRET_KEY = "change-me-in-production"
+_NON_PROD_ENVIRONMENTS = {"local", "dev", "development", "test", "testing", "ci"}
 
 
 class Settings(BaseSettings):
@@ -84,6 +87,24 @@ class Settings(BaseSettings):
         if self.REDIS_PASSWORD:
             return f"redis://:{self.REDIS_PASSWORD}@{self.REDIS_HOST}:{self.REDIS_PORT}/0"
         return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}/0"
+
+    @model_validator(mode="after")
+    def _fail_fast_on_insecure_prod_secret(self) -> "Settings":
+        """Refuse to boot in production with the default SECRET_KEY.
+
+        The default key would sign JWTs anyone could forge (P0-2). Outside
+        local/dev/test we require a real secret to be set in the environment.
+        """
+        if (
+            self.ENVIRONMENT.lower() not in _NON_PROD_ENVIRONMENTS
+            and self.SECRET_KEY == _INSECURE_SECRET_KEY
+        ):
+            raise ValueError(
+                f"SECRET_KEY must be set to a strong, unique value when "
+                f"ENVIRONMENT={self.ENVIRONMENT!r} (got the insecure default). "
+                f"Generate one with `openssl rand -hex 32` and set it in the environment."
+            )
+        return self
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
