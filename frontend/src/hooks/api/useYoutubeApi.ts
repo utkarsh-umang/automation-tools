@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, YoutubeBatchesService, YoutubeCreditsService, YoutubeLeadsService } from '@/client'
+import { getToken } from '@/utils/token'
+
+/**
+ * Auth header for the handful of endpoints hit with raw `fetch` (finalize,
+ * reset-to-pending, export) instead of the generated client. The YouTube API
+ * now requires a JWT, so these must send the Bearer token too.
+ */
+function authHeaders(): HeadersInit {
+  const token = getToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
 
 export type BatchStatus = 'queued' | 'running' | 'paused' | 'completed' | 'finalized' | 'failed'
 export type TermStatus = 'pending' | 'running' | 'done' | 'failed'
@@ -188,7 +199,10 @@ export function useFinalizeBatchMutation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (batchId: string) => {
-      const response = await fetch(`/api/v1/youtube/batches/${batchId}/finalize`, { method: 'POST' })
+      const response = await fetch(`/api/v1/youtube/batches/${batchId}/finalize`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
       if (!response.ok) {
         const body = await response.json().catch(() => ({}))
         throw new Error(body?.detail ?? `Finalize failed (${response.status})`)
@@ -218,7 +232,7 @@ export function useResetSearchTermToPendingMutation(batchId: string) {
     mutationFn: async (termId: string) => {
       const response = await fetch(
         `/api/v1/youtube/batches/${batchId}/terms/${termId}/reset-to-pending`,
-        { method: 'POST' },
+        { method: 'POST', headers: authHeaders() },
       )
       const body = await response.json().catch(() => ({}))
       if (!response.ok) {
@@ -238,7 +252,9 @@ export function useResetSearchTermToPendingMutation(batchId: string) {
 export function useExportBatchMutation() {
   return useMutation({
     mutationFn: async (batchId: string) => {
-      const response = await fetch(`/api/v1/youtube/batches/${batchId}/export`)
+      const response = await fetch(`/api/v1/youtube/batches/${batchId}/export`, {
+        headers: authHeaders(),
+      })
       if (!response.ok) throw new Error('Export failed')
       const blob = await response.blob()
       const disposition = response.headers.get('Content-Disposition') ?? ''
