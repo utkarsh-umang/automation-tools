@@ -42,7 +42,7 @@ LOCK_TTL_SECONDS = 600  # 10 minutes
 PACIFIC_TZ = ZoneInfo("America/Los_Angeles")
 
 
-@celery_app.task(name="youtube.run_batch", bind=True)
+@celery_app.task(name="youtube.run_batch", bind=True, acks_late=True)
 def run_batch(self, batch_id: str) -> None:
     """Orchestrate all pending terms in a batch for today's run."""
     redis_client = get_raw_redis()
@@ -73,6 +73,7 @@ def _normalise_credits_by_key(usage: dict, num_keys: int) -> dict[str, int]:
 def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
     """Inner run logic (separated from the lock boilerplate for clarity)."""
     today = datetime.now(PACIFIC_TZ).date().isoformat()
+    lock_key = f"batch_lock:{batch_id}"
 
     try:
         api_keys = get_ordered_youtube_api_keys()
@@ -185,6 +186,12 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
 
         total, by_key = aggregate_from_redis(redis_client, today, n_keys)
         daily_usage_repo.set_credits_used_and_by_key(total, by_key)
+
+        # Heartbeat: renew the run lock after each term so it stays alive for the
+        # whole (potentially long) run. The scheduler treats a live lock as
+        # proof the worker is still running; if the worker dies, the lock lapses
+        # (≤ LOCK_TTL_SECONDS) and the scheduler's reaper recovers the batch.
+        redis_client.expire(lock_key, LOCK_TTL_SECONDS)
 
     total, by_key = aggregate_from_redis(redis_client, today, n_keys)
     daily_usage_repo.set_credits_used_and_by_key(total, by_key)
