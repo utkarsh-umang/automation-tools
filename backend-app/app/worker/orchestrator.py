@@ -74,7 +74,14 @@ def _run(batch_id: str, redis_client) -> None:  # noqa: ANN001
     """Inner run logic (separated from the lock boilerplate for clarity)."""
     today = datetime.now(PACIFIC_TZ).date().isoformat()
 
-    api_keys = get_ordered_youtube_api_keys()
+    try:
+        api_keys = get_ordered_youtube_api_keys()
+    except ValueError as exc:
+        logger.error("run_batch: %s — marking batch %s as failed", exc, batch_id)
+        batch_repo.update_status(batch_id, BatchStatus.FAILED)
+        job_log_repo.append(batch_id, "run_failed", str(exc))
+        return
+
     n_keys = len(api_keys)
     per_limit = config.YOUTUBE_DAILY_CREDIT_LIMIT
 
