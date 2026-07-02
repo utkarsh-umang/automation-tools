@@ -22,3 +22,15 @@ export function decodeTokenPayload(token: string): Record<string, unknown> | nul
     return null
   }
 }
+
+/**
+ * True if the token is missing, malformed, or past its `exp` claim. Used so an
+ * expired token isn't treated as a live session (the backend rejects it with
+ * 401 anyway, but this avoids showing a logged-in shell that can't load data).
+ */
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) return true
+  const exp = decodeTokenPayload(token)?.exp
+  if (typeof exp !== 'number') return true
+  return Date.now() >= exp * 1000
+}

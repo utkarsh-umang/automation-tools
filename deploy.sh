@@ -7,6 +7,9 @@ VM_USER="utk_umang"
 VM_IP="34.68.94.96"
 VM_DIR="~/automation-tools"
 COMPOSE_FILE="docker-compose.prod.yml"
+# Immutable per-deploy tag so every pushed image is traceable to a commit and
+# can be rolled back to. Falls back to a timestamp if not in a git checkout.
+TAG="$(git rev-parse --short HEAD 2>/dev/null || date +%Y%m%d%H%M%S)"
 # ──────────────────────────────────────────────────────────────────────────────
 
 BOLD="\033[1m"
@@ -28,15 +31,15 @@ sync_compose() {
 }
 
 deploy_backend() {
-    log "Building backend image..."
-    docker build --platform linux/amd64 -t "$REGISTRY/backend:latest" ./backend-app -f ./backend-app/Dockerfile
+    log "Building backend image (tag: latest + ${TAG})..."
+    docker build --platform linux/amd64 -t "$REGISTRY/backend:latest" -t "$REGISTRY/backend:${TAG}" ./backend-app -f ./backend-app/Dockerfile
 
-    log "Building celery-worker image..."
-    docker build --platform linux/amd64 -t "$REGISTRY/celery-worker:latest" ./backend-app -f ./backend-app/Dockerfile.celery
+    log "Building celery-worker image (tag: latest + ${TAG})..."
+    docker build --platform linux/amd64 -t "$REGISTRY/celery-worker:latest" -t "$REGISTRY/celery-worker:${TAG}" ./backend-app -f ./backend-app/Dockerfile.celery
 
     log "Pushing backend images..."
-    docker push "$REGISTRY/backend:latest"
-    docker push "$REGISTRY/celery-worker:latest"
+    docker push "$REGISTRY/backend:latest" && docker push "$REGISTRY/backend:${TAG}"
+    docker push "$REGISTRY/celery-worker:latest" && docker push "$REGISTRY/celery-worker:${TAG}"
 
     sync_compose
 
@@ -48,11 +51,11 @@ deploy_backend() {
 }
 
 deploy_frontend() {
-    log "Building frontend image..."
-    docker build --platform linux/amd64 -t "$REGISTRY/frontend:latest" ./frontend -f ./frontend/Dockerfile
+    log "Building frontend image (tag: latest + ${TAG})..."
+    docker build --platform linux/amd64 -t "$REGISTRY/frontend:latest" -t "$REGISTRY/frontend:${TAG}" ./frontend -f ./frontend/Dockerfile
 
     log "Pushing frontend image..."
-    docker push "$REGISTRY/frontend:latest"
+    docker push "$REGISTRY/frontend:latest" && docker push "$REGISTRY/frontend:${TAG}"
 
     sync_compose
 

@@ -24,18 +24,27 @@ def add_request_id_middleware(app: FastAPI) -> None:
     return None  # type: ignore
 
 
+# In production, don't expose the interactive API docs / OpenAPI schema — they
+# hand out a complete, labeled map of every endpoint (P1-4).
+_NON_PROD = {"local", "dev", "development", "test", "testing", "ci"}
+_IS_PROD = config.ENVIRONMENT.lower() not in _NON_PROD
+
 app = FastAPI(
     title="FastAPI Backend",
     version="0.1.0",
-    openapi_url="/openapi.json",
+    openapi_url=None if _IS_PROD else "/openapi.json",
+    docs_url=None if _IS_PROD else "/docs",
+    redoc_url=None if _IS_PROD else "/redoc",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # Scoped instead of wildcard (P1-8). The SPA is same-origin via nginx, so
+    # this is defense-in-depth; wildcard + credentials is also invalid per spec.
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 add_request_id_middleware(app)

@@ -2,7 +2,7 @@ import { createContext, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { OpenAPI } from '@/client'
 import type { AuthUser } from '@/types/auth'
-import { getToken, removeToken, setToken } from '@/utils/token'
+import { getToken, isTokenExpired, removeToken, setToken } from '@/utils/token'
 
 interface AuthContextValue {
   user: AuthUser | null
@@ -29,7 +29,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // an immediate redirect to /login before the token is read.
   useEffect(() => {
     const stored = getToken()
-    if (stored) {
+    if (stored && !isTokenExpired(stored)) {
       OpenAPI.TOKEN = stored
       setTokenState(stored)
       try {
@@ -40,6 +40,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch {
         // ignore parse errors
       }
+    } else if (stored) {
+      // Expired/malformed token → clear it so we don't render a logged-in
+      // shell that can only 401.
+      removeToken()
+      localStorage.removeItem('auth_user')
     }
     setIsInitialized(true)
   }, [])
