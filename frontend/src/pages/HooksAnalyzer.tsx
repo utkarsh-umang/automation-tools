@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link2, Zap, Clock, PlusCircle, History, Clapperboard, Activity, CheckCircle2, ChevronRight, Play, ExternalLink, ArrowRight, ArrowLeft, Loader2, Edit3, SpellCheck } from 'lucide-react'
+import { Link2, Zap, Clock, PlusCircle, History, Clapperboard, Activity, CheckCircle2, ChevronRight, Play, ExternalLink, ArrowRight, ArrowLeft, Loader2 } from 'lucide-react'
 
 type ViewState = 'initial' | 'loading' | 'transcript' | 'transcript-view' | 'results'
 
