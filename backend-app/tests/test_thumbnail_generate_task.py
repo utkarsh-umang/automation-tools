@@ -7,7 +7,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
+from celery.exceptions import MaxRetriesExceededError, Retry, SoftTimeLimitExceeded
 
 from app.worker.thumbnail import generate as gen_mod
 from app.worker.thumbnail.generate import generate_thumbnail_task
@@ -273,4 +273,65 @@ def test_max_retries_marks_failed_with_truncation() -> None:
                 _jid, msg = mf.call_args[0]
                 assert _jid == jid
                 assert len(msg) == 500
+                cap.assert_called_once()
+
+
+def test_scheduled_retry_does_not_mark_failed() -> None:
+    """A normal, successfully-scheduled retry (Retry raised, retries remain)
+    must propagate to Celery untouched — not be treated as exhausted."""
+    jid = str(uuid.uuid4())
+
+    def _close_coro_and_raise_value(coro):  # type: ignore[no-untyped-def]
+        coro.close()
+        raise ValueError("transient error")
+
+    with patch(
+        "app.worker.thumbnail.generate.asyncio.run",
+        side_effect=_close_coro_and_raise_value,
+    ):
+        with patch.object(
+            generate_thumbnail_task,
+            "retry",
+            side_effect=Retry("retry scheduled"),
+        ):
+            with patch(
+                "app.worker.thumbnail.generate._run_mark_pg_failed"
+            ) as mf:
+                with pytest.raises(Retry):
+                    generate_thumbnail_task.run(jid)
+                mf.assert_not_called()
+
+
+def test_retry_reraising_original_exception_still_marks_failed() -> None:
+    """Regression: some Celery configs re-raise the original exception directly
+    on exhausted retries instead of MaxRetriesExceededError (seen in production —
+    a ValueError propagated as "raised unexpected" and left the job stuck at its
+    last-known status instead of being marked failed). Any non-Retry exception
+    out of self.retry() must still mark the job failed.
+    """
+    jid = str(uuid.uuid4())
+
+    def _close_coro_and_raise_value(coro):  # type: ignore[no-untyped-def]
+        coro.close()
+        raise ValueError("Unsupported thumbnail model: 'fluxkontext'")
+
+    with patch(
+        "app.worker.thumbnail.generate.asyncio.run",
+        side_effect=_close_coro_and_raise_value,
+    ):
+        with patch.object(
+            generate_thumbnail_task,
+            "retry",
+            side_effect=ValueError("Unsupported thumbnail model: 'fluxkontext'"),
+        ):
+            with patch(
+                "app.worker.thumbnail.generate._run_mark_pg_failed"
+            ) as mf:
+                with patch(
+                    "app.worker.thumbnail.generate.capture_thumbnail_task_exhausted_retries"
+                ) as cap:
+                    generate_thumbnail_task.run(jid)
+                mf.assert_called_once_with(
+                    jid, "Unsupported thumbnail model: 'fluxkontext'"
+                )
                 cap.assert_called_once()

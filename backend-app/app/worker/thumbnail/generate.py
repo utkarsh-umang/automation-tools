@@ -19,7 +19,7 @@ import logging
 import time
 import uuid
 
-from celery.exceptions import MaxRetriesExceededError, SoftTimeLimitExceeded
+from celery.exceptions import Retry, SoftTimeLimitExceeded
 
 from app.celery_app import celery_app
 from app.core.error_reporting import capture_thumbnail_task_exhausted_retries
@@ -110,7 +110,7 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         base_image_urls = list(details.get("base_image_urls") or [])
 
     model = details.get("model")
-    if model not in ("gptimage", "nanobanana"):
+    if model not in ("gptimage", "nanobanana", "fluxkontext"):
         raise ValueError(f"Unsupported thumbnail model: {model!r}")
 
     logger.info(
@@ -212,7 +212,14 @@ def generate_thumbnail_task(self, job_id: str) -> None:
     except Exception as exc:
         try:
             raise self.retry(exc=exc, countdown=10)
-        except MaxRetriesExceededError:
+        except Retry:
+            # A real retry got scheduled — let Celery's task machinery handle it.
+            raise
+        except Exception:
+            # Retries exhausted. Depending on Celery version/config this is either
+            # MaxRetriesExceededError OR `exc` itself re-raised directly — catch
+            # broadly (excluding Retry above) so both cases reliably mark the job
+            # failed instead of leaving it stuck at its last-known status forever.
             logger.error(
                 "thumbnail.generate event=task_failed job_id=%s error=%s "
                 "attempt_number=%s",
