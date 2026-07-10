@@ -18,6 +18,7 @@ from app.schemas.thumbnails import (
     ThumbnailJobPublic,
     ThumbnailListResponse,
     ThumbnailSelectCandidateRequest,
+    ThumbnailUsageResponse,
 )
 from app.services import thumbnail_service
 
@@ -57,6 +58,7 @@ async def create_thumbnail(
     creative_comments: str = Form(),
     model: str = Form(),
     folder_id: uuid.UUID | None = Form(default=None),
+    shorts_or_reels: bool = Form(default=False),
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ThumbnailJobCreatedResponse:
@@ -79,7 +81,16 @@ async def create_thumbnail(
         creative_comments=creative_comments,
         model=model,
         folder_id=folder_id,
+        shorts_or_reels=shorts_or_reels,
     )
+
+
+@router.get("/usage", response_model=ThumbnailUsageResponse)
+async def get_thumbnail_usage(
+    _: CurrentUser = Depends(get_current_user),
+) -> ThumbnailUsageResponse:
+    """Shared org-wide monthly usage for the capped models (gptimage, nanobanana)."""
+    return await thumbnail_service.get_thumbnail_usage()
 
 
 @router.get("", response_model=ThumbnailListResponse)

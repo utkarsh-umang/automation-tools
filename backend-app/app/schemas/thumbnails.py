@@ -44,6 +44,7 @@ class ThumbnailJobPublic(BaseModel):
     include_title: bool | None = None
     creative_comments: str | None = None
     model: str | None = None
+    shorts_or_reels: bool | None = None
     feedback: str | None = None
     prompt_used: str | None = None
 
@@ -55,3 +56,17 @@ class ThumbnailListResponse(BaseModel):
 
 class ThumbnailHistoryResponse(BaseModel):
     jobs: list[ThumbnailJobPublic]
+
+
+class ModelUsage(BaseModel):
+    used: int
+    limit: int | None
+    """``limit=None`` means unlimited (e.g. fluxkontext)."""
+
+
+class ThumbnailUsageResponse(BaseModel):
+    """Shared org-wide monthly usage for capped models. Period is the current
+    calendar month (UTC); resets automatically at the month boundary."""
+
+    period_start: datetime
+    usage: dict[str, ModelUsage]

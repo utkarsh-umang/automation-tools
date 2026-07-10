@@ -16,6 +16,7 @@ import {
   useThumbnailFeedbackMutation,
   useThumbnailHistoryQuery,
   useThumbnailJobQuery,
+  useThumbnailUsageQuery,
 } from '@/hooks/api/useThumbnailApi'
 
 type ThumbnailDetailModalProps = {
@@ -40,6 +41,7 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
 
   const { data: job, isLoading, isError, error, refetch } = useThumbnailJobQuery(viewedJobId)
   const { data: historyData } = useThumbnailHistoryQuery(viewedJobId)
+  const { data: usageData } = useThumbnailUsageQuery()
   const feedbackMutation = useThumbnailFeedbackMutation()
   const selectMutation = useSelectThumbnailCandidateMutation()
 
@@ -254,6 +256,14 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
                   {modelLabel(job?.model)}
                 </div>
               </div>
+              <div>
+                <label className="block text-[11px] font-black text-gray-400 uppercase tracking-widest mb-2.5">
+                  Format
+                </label>
+                <div className="bg-[#f8faff] text-[#0f1f4a] p-3.5 rounded-2xl font-bold border border-blue-100/50 flex items-center gap-2">
+                  {job?.shorts_or_reels ? 'Shorts & Reels (9:16)' : 'Landscape (16:9)'}
+                </div>
+              </div>
             </div>
 
             {job?.creative_comments && (
@@ -322,9 +332,24 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
                   disabled={!canRequestRevision || feedbackMutation.isPending}
                   className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium"
                 >
-                  <option value={ThumbnailFeedbackRequest.model.FLUXKONTEXT}>Flux Kontext</option>
-                  <option value={ThumbnailFeedbackRequest.model.GPTIMAGE}>GPT Image</option>
-                  <option value={ThumbnailFeedbackRequest.model.NANOBANANA}>Nano Banana</option>
+                  {(
+                    [
+                      { value: ThumbnailFeedbackRequest.model.FLUXKONTEXT, label: 'Flux Kontext' },
+                      { value: ThumbnailFeedbackRequest.model.GPTIMAGE, label: 'GPT Image' },
+                      { value: ThumbnailFeedbackRequest.model.NANOBANANA, label: 'Nano Banana' },
+                    ] as const
+                  ).map((opt) => {
+                    const cap = usageData?.usage[opt.value]
+                    const remaining = cap?.limit != null ? cap.limit - cap.used : null
+                    const exhausted = remaining != null && remaining <= 0
+                    return (
+                      <option key={opt.value} value={opt.value} disabled={exhausted}>
+                        {opt.label}
+                        {remaining != null ? ` (${Math.max(remaining, 0)}/${cap!.limit} left)` : ''}
+                        {exhausted ? ' — limit reached' : ''}
+                      </option>
+                    )
+                  })}
                 </select>
                 <button
                   type="submit"

@@ -15,6 +15,7 @@ Schema::
         "include_title": bool,
         "creative_comments": str,    # merged on each iteration
         "model": str,
+        "shorts_or_reels": bool,     # 9:16 vertical (Shorts/Reels) vs 16:9 landscape
         "feedback": str | None,
         "prompt_used": str | None,
         "created_at": datetime,
@@ -38,6 +39,7 @@ class ThumbnailJobDetailsPayload(TypedDict, total=False):
     include_title: bool
     creative_comments: str
     model: str
+    shorts_or_reels: bool
     feedback: str | None
     prompt_used: str | None
     created_at: datetime

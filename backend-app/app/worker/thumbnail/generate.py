@@ -137,6 +137,7 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         title=details["title"],
         include_title=bool(details["include_title"]),
         creative_comments=details["creative_comments"],
+        shorts_or_reels=bool(details.get("shorts_or_reels", False)),
         num_candidates=_NUM_CANDIDATES,
     )
     agent_ms = int((time.perf_counter() - t_agent) * 1000)

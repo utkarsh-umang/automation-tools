@@ -6,6 +6,7 @@ All reads/writes for this collection go through this module. Schema: see
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from pymongo.collection import Collection
@@ -22,12 +23,26 @@ def _collection(db_name: str | None = None) -> Collection:
 
 
 def ensure_thumbnail_job_details_indexes(db_name: str | None = None) -> None:
-    """Create unique index on ``job_id`` (idempotent)."""
+    """Create unique index on ``job_id``, plus a compound index for usage-cap
+    counting (idempotent)."""
     coll = _collection(db_name)
     coll.create_index(
         "job_id",
         unique=True,
         name="idx_thumbnail_job_details_job_id",
+    )
+    coll.create_index(
+        [("model", 1), ("created_at", 1)],
+        name="idx_thumbnail_job_details_model_created_at",
+    )
+
+
+def count_by_model_since(
+    model: str, since: datetime, *, db_name: str | None = None
+) -> int:
+    """Org-wide count of generations for ``model`` at/after ``since`` (usage cap)."""
+    return _collection(db_name).count_documents(
+        {"model": model, "created_at": {"$gte": since}}
     )
 
 
@@ -71,6 +86,7 @@ def update_prompt_used(
 
 __all__ = [
     "THUMBNAIL_JOB_DETAILS_COLLECTION",
+    "count_by_model_since",
     "create_details",
     "ensure_thumbnail_job_details_indexes",
     "get_details",

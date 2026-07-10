@@ -10,5 +10,6 @@ export type Body_create_thumbnail_api_v1_thumbnails_thumbnail_post = {
     creative_comments: string;
     model: string;
     folder_id?: (string | null);
+    shorts_or_reels?: boolean;
 };
 

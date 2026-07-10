@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   getApiErrorMessage,
   useCreateThumbnailMutation,
+  useThumbnailUsageQuery,
 } from '@/hooks/api/useThumbnailApi'
 import {
   useCreateFolderMutation,
@@ -25,6 +26,11 @@ const MODEL_OPTIONS = [
   { value: 'nanobanana', label: 'Nano Banana' },
 ] as const
 
+const FORMAT_OPTIONS = [
+  { value: false, label: 'Landscape (16:9)', hint: 'YouTube thumbnails' },
+  { value: true, label: 'Shorts & Reels (9:16)', hint: 'Vertical, mobile-first' },
+] as const
+
 const NO_FOLDER = ''
 const NEW_FOLDER = '__new__'
 
@@ -37,7 +43,10 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
   const [includeText, setIncludeText] = useState(true)
   const [creativeComments, setCreativeComments] = useState('')
   const [model, setModel] = useState<(typeof MODEL_OPTIONS)[number]['value']>('fluxkontext')
+  const [shortsOrReels, setShortsOrReels] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+
+  const { data: usageData } = useThumbnailUsageQuery()
 
   const { data: folderData } = useFolderListQuery()
   const folders = folderData?.folders ?? []
@@ -148,6 +157,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
         include_title: includeText,
         creative_comments: creativeComments,
         model,
+        shorts_or_reels: shortsOrReels,
         folder_id: folderSelection && folderSelection !== NEW_FOLDER ? folderSelection : undefined,
       })
       refUppy?.cancelAll()
@@ -375,6 +385,43 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
           </div>
         </div>
 
+        <div>
+          <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
+            Format
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {FORMAT_OPTIONS.map((opt) => (
+              <label
+                key={String(opt.value)}
+                className="rounded-lg p-4 cursor-pointer flex items-center gap-3 transition-colors border"
+                style={{
+                  borderColor: shortsOrReels === opt.value ? '#2563eb' : '#e5e7eb',
+                  backgroundColor: shortsOrReels === opt.value ? '#eff6ff' : '#f9fafb',
+                }}
+              >
+                <input
+                  type="radio"
+                  name="format"
+                  className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  checked={shortsOrReels === opt.value}
+                  onChange={() => setShortsOrReels(opt.value)}
+                />
+                <span className="flex flex-col">
+                  <span
+                    className="text-sm font-medium"
+                    style={{ color: shortsOrReels === opt.value ? '#1e40af' : '#374151' }}
+                  >
+                    {opt.label}
+                  </span>
+                  <span className="text-xs" style={{ color: '#6b7280' }}>
+                    {opt.hint}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div>
             <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
@@ -431,17 +478,28 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
                 e.target.style.boxShadow = 'none'
               }}
             >
-              {MODEL_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
+              {MODEL_OPTIONS.map((opt) => {
+                const cap = usageData?.usage[opt.value]
+                const remaining = cap?.limit != null ? cap.limit - cap.used : null
+                const exhausted = remaining != null && remaining <= 0
+                return (
+                  <option key={opt.value} value={opt.value} disabled={exhausted}>
+                    {opt.label}
+                    {remaining != null ? ` — ${Math.max(remaining, 0)}/${cap!.limit} left this month` : ''}
+                    {exhausted ? ' (limit reached)' : ''}
+                  </option>
+                )
+              })}
             </select>
             <ChevronDown
               className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
               style={{ color: '#6b7280' }}
             />
           </div>
+          <p className="mt-1 text-xs" style={{ color: '#6b7280' }}>
+            GPT Image and Nano Banana share a team-wide limit of 50 generations/month each.
+            Flux Kontext has no limit.
+          </p>
         </div>
 
         {formError && (

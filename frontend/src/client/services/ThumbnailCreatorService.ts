@@ -9,6 +9,7 @@ import type { ThumbnailJobCreatedResponse } from '../models/ThumbnailJobCreatedR
 import type { ThumbnailJobPublic } from '../models/ThumbnailJobPublic';
 import type { ThumbnailListResponse } from '../models/ThumbnailListResponse';
 import type { ThumbnailSelectCandidateRequest } from '../models/ThumbnailSelectCandidateRequest';
+import type { ThumbnailUsageResponse } from '../models/ThumbnailUsageResponse';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -58,6 +59,18 @@ export class ThumbnailCreatorService {
             errors: {
                 422: `Validation Error`,
             },
+        });
+    }
+    /**
+     * Get Thumbnail Usage
+     * Shared org-wide monthly usage for the capped models (gptimage, nanobanana).
+     * @returns ThumbnailUsageResponse Successful Response
+     * @throws ApiError
+     */
+    public static getThumbnailUsageApiV1ThumbnailsThumbnailUsageGet(): CancelablePromise<ThumbnailUsageResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/thumbnails/thumbnail/usage',
         });
     }
     /**

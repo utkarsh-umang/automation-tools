@@ -13,19 +13,46 @@ from app.constants.s3_keys import thumbnail_input_base_key, thumbnail_input_refe
 from app.repositories import folder_repo, mongo_repo, pg_repo
 from app.schemas.thumbnail_job_details import ThumbnailJobDetailsPayload
 from app.schemas.thumbnails import (
+    ModelUsage,
     ThumbnailFeedbackRequest,
     ThumbnailHistoryResponse,
     ThumbnailJobCreatedResponse,
     ThumbnailJobPublic,
     ThumbnailListResponse,
+    ThumbnailUsageResponse,
 )
 from app.services import user_service
 from app.services.s3_upload import S3UploadError, upload_to_s3
 from app.services.thumbnail_access import require_thumbnail_job_owner
 
+# Shared org-wide monthly allowance for the paid-per-image models — Flux Kontext
+# (not in this set) is the cheap default and stays uncapped. Resets on the
+# calendar month boundary (UTC).
+CAPPED_MODELS = ("gptimage", "nanobanana")
+MONTHLY_MODEL_CAP = 50
+
 
 def _as_uuid(v: Any) -> uuid.UUID:
     return v if isinstance(v, uuid.UUID) else uuid.UUID(str(v))
+
+
+def _start_of_current_month() -> datetime:
+    now = datetime.now(UTC)
+    return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+async def _check_model_quota(model: str) -> None:
+    if model not in CAPPED_MODELS:
+        return
+    used = mongo_repo.count_by_model_since(model, _start_of_current_month())
+    if used >= MONTHLY_MODEL_CAP:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Monthly limit of {MONTHLY_MODEL_CAP} {model} generations reached "
+                "for the whole team. Try Flux Kontext instead, or wait until next month."
+            ),
+        )
 
 
 def _job_row_to_public(
@@ -55,6 +82,7 @@ def _job_row_to_public(
         "include_title": None,
         "creative_comments": None,
         "model": None,
+        "shorts_or_reels": None,
         "feedback": None,
         "prompt_used": None,
     }
@@ -67,6 +95,7 @@ def _job_row_to_public(
             "include_title",
             "creative_comments",
             "model",
+            "shorts_or_reels",
             "feedback",
             "prompt_used",
         ):
@@ -86,17 +115,20 @@ async def create_thumbnail_job(
     creative_comments: str,
     model: str,
     folder_id: uuid.UUID | None = None,
+    shorts_or_reels: bool = False,
 ) -> ThumbnailJobCreatedResponse:
     """``created_by`` is always ``user_id`` from the verified JWT.
 
     ``folder_id`` (optional) pulls in that folder's persistent client-style
-    prompt, prepended to ``creative_comments`` before generation.
+    prompt, prepended to ``creative_comments`` before generation. ``shorts_or_reels``
+    generates a 9:16 vertical frame (Shorts/Reels) instead of 16:9 landscape.
     """
     if model not in ("gptimage", "nanobanana", "fluxkontext"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="model must be gptimage, nanobanana, or fluxkontext",
         )
+    await _check_model_quota(model)
 
     if folder_id is not None:
         folder = await folder_repo.get_folder(session, folder_id)
@@ -151,6 +183,7 @@ async def create_thumbnail_job(
         "include_title": include_title,
         "creative_comments": creative_comments,
         "model": model,
+        "shorts_or_reels": shorts_or_reels,
         "feedback": None,
         "prompt_used": None,
         "created_at": datetime.now(UTC),
@@ -250,6 +283,7 @@ async def submit_thumbnail_feedback(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Missing stored details for parent job",
         )
+    await _check_model_quota(body.model)
 
     new_id = uuid.uuid4()
     root_raw = parent.get("root_job_id") or parent["id"]
@@ -287,6 +321,7 @@ async def submit_thumbnail_feedback(
         "include_title": bool(details.get("include_title", True)),
         "creative_comments": merged,
         "model": body.model,
+        "shorts_or_reels": bool(details.get("shorts_or_reels", False)),
         "feedback": body.feedback,
         "prompt_used": None,
         "created_at": datetime.now(UTC),
@@ -327,3 +362,20 @@ async def get_thumbnail_history(
         for r in rows
     ]
     return ThumbnailHistoryResponse(jobs=jobs)
+
+
+async def get_thumbnail_usage() -> ThumbnailUsageResponse:
+    """Shared org-wide usage for the current calendar month, capped models only."""
+    period_start = _start_of_current_month()
+    usage = {
+        model: ModelUsage(
+            used=mongo_repo.count_by_model_since(model, period_start),
+            limit=MONTHLY_MODEL_CAP,
+        )
+        for model in CAPPED_MODELS
+    }
+    usage["fluxkontext"] = ModelUsage(
+        used=mongo_repo.count_by_model_since("fluxkontext", period_start),
+        limit=None,
+    )
+    return ThumbnailUsageResponse(period_start=period_start, usage=usage)

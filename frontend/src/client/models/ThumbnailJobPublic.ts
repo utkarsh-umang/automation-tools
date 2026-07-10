@@ -23,6 +23,7 @@ export type ThumbnailJobPublic = {
     include_title?: (boolean | null);
     creative_comments?: (string | null);
     model?: (string | null);
+    shorts_or_reels?: (boolean | null);
     feedback?: (string | null);
     prompt_used?: (string | null);
 };

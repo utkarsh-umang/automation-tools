@@ -24,6 +24,7 @@ export const thumbnailKeys = {
   list: () => [...thumbnailKeys.all, 'list'] as const,
   job: (id: string) => [...thumbnailKeys.all, 'job', id] as const,
   history: (id: string) => [...thumbnailKeys.all, 'history', id] as const,
+  usage: () => [...thumbnailKeys.all, 'usage'] as const,
 }
 
 /**
@@ -75,6 +76,13 @@ export function useThumbnailJobQuery(jobId: string | undefined) {
   })
 }
 
+export function useThumbnailUsageQuery() {
+  return useQuery({
+    queryKey: thumbnailKeys.usage(),
+    queryFn: () => ThumbnailCreatorService.getThumbnailUsageApiV1ThumbnailsThumbnailUsageGet(),
+  })
+}
+
 export function useThumbnailHistoryQuery(jobId: string | undefined) {
   return useQuery({
     queryKey: thumbnailKeys.history(jobId ?? ''),
@@ -90,6 +98,7 @@ export function useCreateThumbnailMutation() {
       ThumbnailCreatorService.createThumbnailApiV1ThumbnailsThumbnailPost(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: thumbnailKeys.list() })
+      void qc.invalidateQueries({ queryKey: thumbnailKeys.usage() })
     },
   })
 }
@@ -129,6 +138,7 @@ export function useThumbnailFeedbackMutation() {
       void qc.invalidateQueries({ queryKey: thumbnailKeys.list() })
       void qc.invalidateQueries({ queryKey: thumbnailKeys.job(jobId) })
       void qc.invalidateQueries({ queryKey: thumbnailKeys.history(jobId) })
+      void qc.invalidateQueries({ queryKey: thumbnailKeys.usage() })
     },
   })
 }

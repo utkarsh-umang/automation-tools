@@ -78,8 +78,13 @@ def test_ensure_indexes(mock_coll_fn: MagicMock) -> None:
     coll = MagicMock()
     mock_coll_fn.return_value = coll
     mongo_repo.ensure_thumbnail_job_details_indexes()
-    coll.create_index.assert_called_once_with(
+    coll.create_index.assert_any_call(
         "job_id",
         unique=True,
         name="idx_thumbnail_job_details_job_id",
     )
+    coll.create_index.assert_any_call(
+        [("model", 1), ("created_at", 1)],
+        name="idx_thumbnail_job_details_model_created_at",
+    )
+    assert coll.create_index.call_count == 2
