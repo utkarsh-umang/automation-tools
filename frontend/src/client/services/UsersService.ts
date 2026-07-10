@@ -9,6 +9,17 @@ import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class UsersService {
     /**
+     * Get the current user's own profile (role included)
+     * @returns UserResponse Successful Response
+     * @throws ApiError
+     */
+    public static getMeApiV1UsersMeGet(): CancelablePromise<UserResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/users/me',
+        });
+    }
+    /**
      * Bootstrap first ADMIN (only works when no users exist)
      * Create the very first ADMIN user when the users table is empty.
      * This endpoint is unauthenticated intentionally — use it once from the

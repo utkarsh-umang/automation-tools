@@ -10,6 +10,8 @@ export type ThumbnailJobPublic = {
     error: (string | null);
     parent_job_id: (string | null);
     root_job_id: (string | null);
+    created_by: string;
+    created_by_email?: (string | null);
     created_at: string;
     updated_at: string;
     completed_at: (string | null);

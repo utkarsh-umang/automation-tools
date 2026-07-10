@@ -92,11 +92,14 @@ async def update_failed(
 
 async def list_jobs_by_user(
     session: AsyncSession,
-    user_id: uuid.UUID,
+    user_id: uuid.UUID | None,
     cursor: uuid.UUID | None,
     limit: int,
 ) -> list[dict[str, Any]]:
-    stmt = select(ThumbnailJob).where(ThumbnailJob.created_by == user_id)
+    """``user_id=None`` lists jobs across all users (ADMIN-only callers)."""
+    stmt = select(ThumbnailJob)
+    if user_id is not None:
+        stmt = stmt.where(ThumbnailJob.created_by == user_id)
     if cursor is not None:
         cur_job = await session.get(ThumbnailJob, cursor)
         if cur_job is None:

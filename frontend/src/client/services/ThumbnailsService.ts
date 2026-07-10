@@ -34,6 +34,7 @@ export class ThumbnailsService {
     }
     /**
      * List Thumbnails
+     * ADMIN sees thumbnails from every member; MEMBER sees only their own.
      * @param cursor
      * @param limit
      * @returns ThumbnailListResponse Successful Response

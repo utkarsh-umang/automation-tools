@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
+import { AdminRoute } from '@/components/AdminRoute'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { ScrollToTop } from '@/components/ScrollToTop'
 import { ComingSoonScreen } from '@/pages/ComingSoonScreen'
@@ -23,49 +24,6 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
 
-          <Route path="/youtube-script" element={<YouTubeScriptLayout />}>
-            <Route index element={<YouTubeScriptTool />} />
-            <Route path="batch/:batchId" element={<BatchDetailPage />} />
-          </Route>
-
-          <Route path="/hooks-analyzer" element={<AppShell><HooksAnalyzer /></AppShell>} />
-
-          <Route
-            path="/podscan"
-            element={
-              <AppShell breadcrumb="Podcast Collab List Creator">
-                <PodcastCollabListCreator />
-              </AppShell>
-            }
-          />
-          <Route
-            path="/podscan/:id"
-            element={<PodcastCollabListCreatorTableView />}
-          />
-
-          <Route
-            path="/library-lp"
-            element={
-              <AppShell breadcrumb="Library LP Creator">
-                <ComingSoonScreen
-                  title="Library LP Creator"
-                  description="Generate landing pages from your content library templates."
-                />
-              </AppShell>
-            }
-          />
-
-          <Route
-            path="/lead-magnet-pdf"
-            element={
-              <AppShell breadcrumb="Lead Magnet PDF">
-                <ComingSoonScreen
-                  title="Lead Magnet PDF"
-                  description="Create client-ready PDF lead magnets from outlines."
-                />
-              </AppShell>
-            }
-          />
           <Route
             path="/thumbnail"
             element={
@@ -74,6 +32,54 @@ function App() {
               </AppShell>
             }
           />
+
+          {/* MEMBER accounts are restricted to the thumbnail creator above — everything
+              below is ADMIN-only, mirroring the backend's require_roles("ADMIN") gating. */}
+          <Route element={<AdminRoute />}>
+            <Route path="/youtube-script" element={<YouTubeScriptLayout />}>
+              <Route index element={<YouTubeScriptTool />} />
+              <Route path="batch/:batchId" element={<BatchDetailPage />} />
+            </Route>
+
+            <Route path="/hooks-analyzer" element={<AppShell><HooksAnalyzer /></AppShell>} />
+
+            <Route
+              path="/podscan"
+              element={
+                <AppShell breadcrumb="Podcast Collab List Creator">
+                  <PodcastCollabListCreator />
+                </AppShell>
+              }
+            />
+            <Route
+              path="/podscan/:id"
+              element={<PodcastCollabListCreatorTableView />}
+            />
+
+            <Route
+              path="/library-lp"
+              element={
+                <AppShell breadcrumb="Library LP Creator">
+                  <ComingSoonScreen
+                    title="Library LP Creator"
+                    description="Generate landing pages from your content library templates."
+                  />
+                </AppShell>
+              }
+            />
+
+            <Route
+              path="/lead-magnet-pdf"
+              element={
+                <AppShell breadcrumb="Lead Magnet PDF">
+                  <ComingSoonScreen
+                    title="Lead Magnet PDF"
+                    description="Create client-ready PDF lead magnets from outlines."
+                  />
+                </AppShell>
+              }
+            />
+          </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

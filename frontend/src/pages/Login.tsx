@@ -2,10 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import logo from '@/assets/logo.png'
-import { ApiError, AuthService } from '@/client'
+import { ApiError, AuthService, OpenAPI, UsersService } from '@/client'
 import { useAuth } from '@/hooks/useAuth'
 import type { AuthUser } from '@/types/auth'
-import { decodeTokenPayload } from '@/utils/token'
 
 export function Login() {
   const navigate = useNavigate()
@@ -16,17 +15,15 @@ export function Login() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const mutation = useMutation({
-    mutationFn: () => AuthService.loginApiV1AuthLoginPost({ email, password }),
-    onSuccess: (data) => {
-      const payload = decodeTokenPayload(data.access_token)
-      const user: AuthUser | undefined = payload
-        ? {
-            id: String(payload.sub ?? ''),
-            email,
-            role: 'MEMBER' as AuthUser['role'],
-          }
-        : undefined
-      login(data.access_token, user)
+    mutationFn: async () => {
+      const token = await AuthService.loginApiV1AuthLoginPost({ email, password })
+      OpenAPI.TOKEN = token.access_token
+      const me = await UsersService.getMeApiV1UsersMeGet()
+      return { token, me }
+    },
+    onSuccess: ({ token, me }) => {
+      const user: AuthUser = { id: me.id, email: me.email, role: me.role }
+      login(token.access_token, user)
       navigate('/dashboard', { replace: true })
     },
     onError: (err: unknown) => {

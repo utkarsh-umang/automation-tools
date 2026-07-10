@@ -1,6 +1,6 @@
 import { createContext, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { OpenAPI } from '@/client'
+import { OpenAPI, UsersService } from '@/client'
 import type { AuthUser } from '@/types/auth'
 import { getToken, isTokenExpired, removeToken, setToken } from '@/utils/token'
 
@@ -40,7 +40,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch {
         // ignore parse errors
       }
-    } else if (stored) {
+      setIsInitialized(true)
+      // Re-fetch the profile so role changes (e.g. an admin promoting a
+      // member) take effect without forcing a logout/login cycle.
+      UsersService.getMeApiV1UsersMeGet()
+        .then((me) => {
+          const freshUser: AuthUser = { id: me.id, email: me.email, role: me.role }
+          localStorage.setItem('auth_user', JSON.stringify(freshUser))
+          setUser(freshUser)
+        })
+        .catch(() => {
+          removeToken()
+          localStorage.removeItem('auth_user')
+          OpenAPI.TOKEN = undefined
+          setTokenState(null)
+          setUser(null)
+        })
+      return
+    }
+    if (stored) {
       // Expired/malformed token → clear it so we don't render a logged-in
       // shell that can only 401.
       removeToken()

@@ -1,7 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { ToolCard } from '@/components/dashboard/ToolCard'
 import { AppShell } from '@/components/layout/AppShell'
-import { tools } from '@/config/tools'
+import { toolsForRole } from '@/config/tools'
+import { useAuth } from '@/hooks/useAuth'
 
 const youtubeWorkflowSteps = ['Create batch', 'Daily run', 'Track progress', 'Export']
 const thumbnailWorkflowSteps = ['Your thumbnails', 'Create with AI', 'Curate & export']
@@ -40,7 +41,11 @@ function FeaturedWorkflowPanel({ label, steps }: { label: string; steps: string[
 
 export function Dashboard() {
   const navigate = useNavigate()
-  const [youtubeTool, thumbnailTool, ...rest] = tools
+  const { user } = useAuth()
+  const tools = toolsForRole(user?.role)
+  const youtubeTool = tools.find((t) => t.id === 'youtube-script')
+  const thumbnailTool = tools.find((t) => t.id === 'thumbnail')
+  const rest = tools.filter((t) => t.id !== 'youtube-script' && t.id !== 'thumbnail')
 
   return (
     <AppShell breadcrumb="Dashboard">
@@ -55,31 +60,35 @@ export function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="md:col-span-2">
-          <ToolCard
-            title={youtubeTool.label}
-            description={youtubeTool.description}
-            tags={youtubeTool.tags}
-            status="live"
-            featured
-            onClick={() => navigate(youtubeTool.path)}
-          >
-            <FeaturedWorkflowPanel label="Workflow preview" steps={youtubeWorkflowSteps} />
-          </ToolCard>
-        </div>
+        {youtubeTool && (
+          <div className="md:col-span-2">
+            <ToolCard
+              title={youtubeTool.label}
+              description={youtubeTool.description}
+              tags={youtubeTool.tags}
+              status="live"
+              featured
+              onClick={() => navigate(youtubeTool.path)}
+            >
+              <FeaturedWorkflowPanel label="Workflow preview" steps={youtubeWorkflowSteps} />
+            </ToolCard>
+          </div>
+        )}
 
-        <div className="md:col-span-2">
-          <ToolCard
-            title={thumbnailTool.label}
-            description={thumbnailTool.description}
-            tags={thumbnailTool.tags}
-            status="live"
-            featured
-            onClick={() => navigate(thumbnailTool.path)}
-          >
-            <FeaturedWorkflowPanel label="Workflow preview" steps={thumbnailWorkflowSteps} />
-          </ToolCard>
-        </div>
+        {thumbnailTool && (
+          <div className="md:col-span-2">
+            <ToolCard
+              title={thumbnailTool.label}
+              description={thumbnailTool.description}
+              tags={thumbnailTool.tags}
+              status="live"
+              featured
+              onClick={() => navigate(thumbnailTool.path)}
+            >
+              <FeaturedWorkflowPanel label="Workflow preview" steps={thumbnailWorkflowSteps} />
+            </ToolCard>
+          </div>
+        )}
 
         {rest.map((tool) => (
           <ToolCard

@@ -19,6 +19,7 @@ from app.schemas.thumbnails import (
     ThumbnailJobPublic,
     ThumbnailListResponse,
 )
+from app.services import user_service
 from app.services.s3_upload import S3UploadError, upload_to_s3
 from app.services.thumbnail_access import require_thumbnail_job_owner
 
@@ -27,7 +28,12 @@ def _as_uuid(v: Any) -> uuid.UUID:
     return v if isinstance(v, uuid.UUID) else uuid.UUID(str(v))
 
 
-def _job_row_to_public(job: dict[str, Any], mongo: dict[str, Any] | None) -> ThumbnailJobPublic:
+def _job_row_to_public(
+    job: dict[str, Any],
+    mongo: dict[str, Any] | None,
+    *,
+    created_by_email: str | None = None,
+) -> ThumbnailJobPublic:
     base = {
         "id": _as_uuid(job["id"]),
         "status": str(job["status"]),
@@ -36,6 +42,8 @@ def _job_row_to_public(job: dict[str, Any], mongo: dict[str, Any] | None) -> Thu
         "error": job.get("error"),
         "parent_job_id": _as_uuid(job["parent_job_id"]) if job.get("parent_job_id") else None,
         "root_job_id": _as_uuid(job["root_job_id"]) if job.get("root_job_id") else None,
+        "created_by": _as_uuid(job["created_by"]),
+        "created_by_email": created_by_email,
         "created_at": job["created_at"],
         "updated_at": job["updated_at"],
         "completed_at": job.get("completed_at"),
@@ -135,25 +143,51 @@ async def list_thumbnail_jobs(
     user_id: uuid.UUID,
     cursor: uuid.UUID | None,
     limit: int,
+    *,
+    is_admin: bool = False,
 ) -> ThumbnailListResponse:
-    rows = await pg_repo.list_jobs_by_user(session, user_id, cursor, limit)
+    """``is_admin`` lists thumbnail jobs across all members, not just ``user_id``."""
+    filter_user_id = None if is_admin else user_id
+    rows = await pg_repo.list_jobs_by_user(session, filter_user_id, cursor, limit)
     job_ids = [str(r["id"]) for r in rows]
     mongo_by_id = mongo_repo.get_details_many(job_ids)
-    jobs = [_job_row_to_public(r, mongo_by_id.get(str(r["id"]))) for r in rows]
+    emails_by_id = await _creator_emails(session, rows) if is_admin else {}
+    jobs = [
+        _job_row_to_public(
+            r,
+            mongo_by_id.get(str(r["id"])),
+            created_by_email=emails_by_id.get(_as_uuid(r["created_by"])),
+        )
+        for r in rows
+    ]
     next_cursor: uuid.UUID | None = None
     if rows and len(rows) == limit:
         next_cursor = _as_uuid(rows[-1]["id"])
     return ThumbnailListResponse(jobs=jobs, next_cursor=next_cursor)
 
 
+async def _creator_emails(
+    session: AsyncSession, rows: list[dict[str, Any]]
+) -> dict[uuid.UUID, str]:
+    creator_ids = {_as_uuid(r["created_by"]) for r in rows}
+    users_by_id = await user_service.get_users_by_ids(session, list(creator_ids))
+    return {uid: user.email for uid, user in users_by_id.items()}
+
+
 async def get_thumbnail_job(
     session: AsyncSession,
     user_id: uuid.UUID,
     job_id: uuid.UUID,
+    *,
+    is_admin: bool = False,
 ) -> ThumbnailJobPublic:
-    job = await require_thumbnail_job_owner(session, job_id, user_id)
+    job = await require_thumbnail_job_owner(session, job_id, user_id, is_admin=is_admin)
     mongo = mongo_repo.get_details(str(job_id))
-    return _job_row_to_public(job, mongo)
+    email = None
+    if is_admin:
+        emails = await _creator_emails(session, [job])
+        email = emails.get(_as_uuid(job["created_by"]))
+    return _job_row_to_public(job, mongo, created_by_email=email)
 
 
 async def submit_thumbnail_feedback(
@@ -217,12 +251,20 @@ async def get_thumbnail_history(
     session: AsyncSession,
     user_id: uuid.UUID,
     job_id: uuid.UUID,
+    *,
+    is_admin: bool = False,
 ) -> ThumbnailHistoryResponse:
-    job = await require_thumbnail_job_owner(session, job_id, user_id)
+    job = await require_thumbnail_job_owner(session, job_id, user_id, is_admin=is_admin)
     root_raw = job.get("root_job_id") or job["id"]
     root_uuid = _as_uuid(root_raw)
     rows = await pg_repo.get_history(session, root_uuid)
+    emails_by_id = await _creator_emails(session, rows) if is_admin else {}
     jobs = [
-        _job_row_to_public(r, mongo_repo.get_details(str(r["id"]))) for r in rows
+        _job_row_to_public(
+            r,
+            mongo_repo.get_details(str(r["id"])),
+            created_by_email=emails_by_id.get(_as_uuid(r["created_by"])),
+        )
+        for r in rows
     ]
     return ThumbnailHistoryResponse(jobs=jobs)

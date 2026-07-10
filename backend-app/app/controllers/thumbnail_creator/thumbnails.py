@@ -86,8 +86,13 @@ async def list_thumbnails(
     cursor: uuid.UUID | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
 ) -> ThumbnailListResponse:
+    """ADMIN sees thumbnails from every member; MEMBER sees only their own."""
     return await thumbnail_service.list_thumbnail_jobs(
-        db, uuid.UUID(current_user.id), cursor, limit
+        db,
+        uuid.UUID(current_user.id),
+        cursor,
+        limit,
+        is_admin=current_user.role == "ADMIN",
     )
 
 
@@ -110,7 +115,7 @@ async def history_thumbnail(
     db: AsyncSession = Depends(get_db_session),
 ) -> ThumbnailHistoryResponse:
     return await thumbnail_service.get_thumbnail_history(
-        db, uuid.UUID(current_user.id), job_id
+        db, uuid.UUID(current_user.id), job_id, is_admin=current_user.role == "ADMIN"
     )
 
 
@@ -121,5 +126,5 @@ async def get_thumbnail(
     db: AsyncSession = Depends(get_db_session),
 ) -> ThumbnailJobPublic:
     return await thumbnail_service.get_thumbnail_job(
-        db, uuid.UUID(current_user.id), job_id
+        db, uuid.UUID(current_user.id), job_id, is_admin=current_user.role == "ADMIN"
     )

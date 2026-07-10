@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom'
 import logo from '@/assets/logo.png'
-import { tools } from '@/config/tools'
+import { toolsForRole } from '@/config/tools'
 import { ToolNavIcon } from '@/components/layout/ToolNavIcon'
+import { useAuth } from '@/hooks/useAuth'
 
 function DashboardNavIcon() {
   const stroke = '#93c5fd'
@@ -36,6 +37,9 @@ const iconWrapStyle = {
 } as const
 
 export function Sidebar() {
+  const { user } = useAuth()
+  const tools = toolsForRole(user?.role)
+
   return (
     <aside
       className="flex h-full w-64 shrink-0 flex-col overflow-hidden border-r"

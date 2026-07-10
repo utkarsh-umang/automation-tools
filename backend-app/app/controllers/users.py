@@ -1,15 +1,32 @@
 """Users controller — admin-managed user creation."""
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import CurrentUser, require_roles
+from app.core.auth import CurrentUser, get_current_user, require_roles
 from app.db.session import get_db_session
 from app.models.user import UserRole
 from app.schemas.auth import UserCreate, UserResponse
-from app.services.user_service import count_users, create_user
+from app.services.user_service import count_users, create_user, get_user_by_id
 
 router = APIRouter()
+
+
+@router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get the current user's own profile (role included)",
+)
+async def get_me(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> UserResponse:
+    user = await get_user_by_id(db, uuid.UUID(current_user.id))
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return UserResponse.model_validate(user)
 
 
 @router.post(

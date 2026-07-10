@@ -1,3 +1,5 @@
+import type { UserRole } from '@/client'
+
 export type ToolNavStatus = 'live' | 'soon'
 
 export type ToolIconId = 'youtube' | 'book' | 'list' | 'pdf' | 'image' | 'chart'
@@ -10,6 +12,8 @@ export interface ToolDefinition {
   description: string
   tags: string[]
   iconId: ToolIconId
+  /** MEMBER accounts only ever see tools with adminOnly: false. ADMIN sees everything. */
+  adminOnly: boolean
 }
 
 export const tools: ToolDefinition[] = [
@@ -21,6 +25,7 @@ export const tools: ToolDefinition[] = [
     description: 'Find channels from search terms and extract contact emails across daily API quota.',
     tags: ['YouTube API', 'Email', 'Batches'],
     iconId: 'youtube',
+    adminOnly: true,
   },
   {
     id: 'thumbnail',
@@ -30,6 +35,7 @@ export const tools: ToolDefinition[] = [
     description: 'Thumbnail concepts and batch exports for short-form.',
     tags: ['Thumbnails', 'Creative'],
     iconId: 'image',
+    adminOnly: false,
   },
   {
     id: 'hooks-analyzer',
@@ -39,6 +45,7 @@ export const tools: ToolDefinition[] = [
     description: 'Deploy high-performance analysis on video hooks to maximize retention.',
     tags: ['Hooks', 'Analysis'],
     iconId: 'chart',
+    adminOnly: true,
   },
   {
     id: 'podscan',
@@ -48,6 +55,7 @@ export const tools: ToolDefinition[] = [
     description: 'Build a Podscan-style collab list from a YouTube channel for outreach (sheet + CSV export).',
     tags: ['Podcasts', 'Leads', 'Podscan'],
     iconId: 'list',
+    adminOnly: true,
   },
   {
     id: 'library-lp',
@@ -57,6 +65,7 @@ export const tools: ToolDefinition[] = [
     description: 'Generate landing pages from your content library templates.',
     tags: ['Landing pages', 'Content'],
     iconId: 'book',
+    adminOnly: true,
   },
   {
     id: 'lead-magnet-pdf',
@@ -66,5 +75,10 @@ export const tools: ToolDefinition[] = [
     description: 'Create client-ready PDF lead magnets from outlines.',
     tags: ['PDF', 'Lead gen'],
     iconId: 'pdf',
+    adminOnly: true,
   },
 ]
+
+export function toolsForRole(role: UserRole | undefined): ToolDefinition[] {
+  return role === 'ADMIN' ? tools : tools.filter((t) => !t.adminOnly)
+}

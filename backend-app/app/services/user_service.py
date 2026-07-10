@@ -44,3 +44,10 @@ async def count_users(db: AsyncSession) -> int:
 
     result = await db.execute(select(func.count()).select_from(User))
     return result.scalar_one()
+
+
+async def get_users_by_ids(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+    if not ids:
+        return {}
+    result = await db.execute(select(User).where(User.id.in_(set(ids))))
+    return {user.id: user for user in result.scalars().all()}

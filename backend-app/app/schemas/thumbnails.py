@@ -27,6 +27,8 @@ class ThumbnailJobPublic(BaseModel):
     error: str | None
     parent_job_id: uuid.UUID | None
     root_job_id: uuid.UUID | None
+    created_by: uuid.UUID
+    created_by_email: str | None = None
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
