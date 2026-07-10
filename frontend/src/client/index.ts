@@ -10,6 +10,10 @@ export type { OpenAPIConfig } from './core/OpenAPI';
 export type { BatchCreateRequest } from './models/BatchCreateRequest';
 export type { BatchFiltersCreate } from './models/BatchFiltersCreate';
 export type { Body_create_thumbnail_api_v1_thumbnails_thumbnail_post } from './models/Body_create_thumbnail_api_v1_thumbnails_thumbnail_post';
+export type { FolderCreate } from './models/FolderCreate';
+export type { FolderListResponse } from './models/FolderListResponse';
+export type { FolderPublic } from './models/FolderPublic';
+export type { FolderUpdate } from './models/FolderUpdate';
 export type { HealthResponse } from './models/HealthResponse';
 export type { HTTPValidationError } from './models/HTTPValidationError';
 export type { ResetTermToPendingResponse } from './models/ResetTermToPendingResponse';
@@ -18,6 +22,7 @@ export type { ThumbnailHistoryResponse } from './models/ThumbnailHistoryResponse
 export type { ThumbnailJobCreatedResponse } from './models/ThumbnailJobCreatedResponse';
 export type { ThumbnailJobPublic } from './models/ThumbnailJobPublic';
 export type { ThumbnailListResponse } from './models/ThumbnailListResponse';
+export type { ThumbnailSelectCandidateRequest } from './models/ThumbnailSelectCandidateRequest';
 export type { Token } from './models/Token';
 export type { UserCreate } from './models/UserCreate';
 export type { UserLogin } from './models/UserLogin';
@@ -26,6 +31,7 @@ export { UserRole } from './models/UserRole';
 export type { ValidationError } from './models/ValidationError';
 
 export { AuthService } from './services/AuthService';
+export { FoldersService } from './services/FoldersService';
 export { HealthService } from './services/HealthService';
 export { ThumbnailCreatorService } from './services/ThumbnailCreatorService';
 export { ThumbnailsService } from './services/ThumbnailsService';

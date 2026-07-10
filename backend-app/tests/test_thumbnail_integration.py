@@ -62,7 +62,10 @@ def _create_thumb_multipart() -> dict[str, Any]:
         },
     }
 
-_DUMMY_S3_URL = "https://integration-test.invalid/out.png"
+_DUMMY_S3_URLS = [
+    "https://integration-test.invalid/out-0.png",
+    "https://integration-test.invalid/out-1.png",
+]
 _DUMMY_PROMPT = "dummy-prompt-used"
 
 # Must match ``thumbnail_creator_router`` mount: /api/v1/thumbnails + /thumbnail
@@ -139,7 +142,10 @@ def stub_agent_and_s3(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
     def _agent(**_kwargs: Any) -> dict[str, Any]:
-        return {"image_bytes": b"\x89PNG\r\n\x1a\n", "prompt_used": _DUMMY_PROMPT}
+        return {
+            "images": [b"\x89PNG\r\n\x1a\n", b"\x89PNG\r\n\x1a\n2"],
+            "prompt_used": _DUMMY_PROMPT,
+        }
 
     monkeypatch.setattr("ai_agents.run_thumbnail_agent", _agent)
     monkeypatch.setattr(
@@ -147,8 +153,8 @@ def stub_agent_and_s3(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda key: f"https://integration-read.invalid/{key}",
     )
     monkeypatch.setattr(
-        "app.worker.thumbnail.generate.upload_thumbnail_png",
-        lambda _jid, _data: _DUMMY_S3_URL,
+        "app.worker.thumbnail.generate.upload_thumbnail_png_candidate",
+        lambda _jid, index, _data: _DUMMY_S3_URLS[index],
     )
 
 
@@ -224,13 +230,26 @@ async def test_full_job_lifecycle_happy_path(
 
     row = await _load_pg(job_id)
     assert row is not None
-    assert row["status"] == "completed"
-    assert row["result_url"] == _DUMMY_S3_URL
+    assert row["status"] == "awaiting_selection"
+    assert row["result_url"] is None
+    assert row["candidate_urls"] == _DUMMY_S3_URLS
     assert row.get("error") in (None, "")
 
     doc = mongo_repo.get_details(job_id)
     assert doc is not None
     assert doc.get("prompt_used") == _DUMMY_PROMPT
+
+    sr = await client.post(
+        f"{_THUMB_BASE}/{job_id}/select",
+        json={"selected_url": _DUMMY_S3_URLS[0]},
+        headers=member_h,
+    )
+    assert sr.status_code == 200, sr.text
+
+    row = await _load_pg(job_id)
+    assert row is not None
+    assert row["status"] == "completed"
+    assert row["result_url"] == _DUMMY_S3_URLS[0]
 
 
 async def test_feedback_lineage_and_merged_comments(
@@ -249,6 +268,12 @@ async def test_feedback_lineage_and_merged_comments(
     assert cr.status_code == 200, cr.text
     job1 = cr.json()["id"]
     await _run_thumbnail_pipeline(job1)
+    sr1 = await client.post(
+        f"{_THUMB_BASE}/{job1}/select",
+        json={"selected_url": _DUMMY_S3_URLS[0]},
+        headers=member_h,
+    )
+    assert sr1.status_code == 200, sr1.text
 
     row1 = await _load_pg(job1)
     assert row1 is not None
@@ -272,9 +297,15 @@ async def test_feedback_lineage_and_merged_comments(
     doc2_pending = mongo_repo.get_details(job2)
     assert doc2_pending is not None
     assert "original-line" in doc2_pending.get("creative_comments", "")
-    assert "Feedback: round-two" in doc2_pending.get("creative_comments", "")
+    assert "Latest revision request: round-two" in doc2_pending.get("creative_comments", "")
 
     await _run_thumbnail_pipeline(job2)
+    sr2 = await client.post(
+        f"{_THUMB_BASE}/{job2}/select",
+        json={"selected_url": _DUMMY_S3_URLS[0]},
+        headers=member_h,
+    )
+    assert sr2.status_code == 200, sr2.text
 
     row2 = await _load_pg(job2)
     assert row2 is not None
@@ -295,14 +326,26 @@ async def test_feedback_lineage_and_merged_comments(
 
     doc3_before = mongo_repo.get_details(job3)
     assert doc3_before is not None
-    assert "Feedback: round-two" in doc3_before.get("creative_comments", "")
-    assert "Feedback: round-three" in doc3_before.get("creative_comments", "")
+    # Each iteration's prompt is built from the ROOT job's original creative
+    # direction plus only the newest feedback — round-two's feedback must NOT
+    # still be present here, otherwise feedback is stacking across iterations
+    # instead of being replaced.
+    assert "original-line" in doc3_before.get("creative_comments", "")
+    assert "Latest revision request: round-three" in doc3_before.get("creative_comments", "")
+    assert "round-two" not in doc3_before.get("creative_comments", "")
 
     await _run_thumbnail_pipeline(job3)
+    sr3 = await client.post(
+        f"{_THUMB_BASE}/{job3}/select",
+        json={"selected_url": _DUMMY_S3_URLS[1]},
+        headers=member_h,
+    )
+    assert sr3.status_code == 200, sr3.text
 
     row3 = await _load_pg(job3)
     assert row3 is not None
     assert row3["status"] == "completed"
+    assert row3["result_url"] == _DUMMY_S3_URLS[1]
     assert row3["iteration"] == 3
     assert uuid.UUID(str(row3["root_job_id"])) == uuid.UUID(str(root1))
     assert uuid.UUID(str(row3["parent_job_id"])) == uuid.UUID(job2)

@@ -10,7 +10,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants.s3_keys import thumbnail_input_base_key, thumbnail_input_reference_key
-from app.repositories import mongo_repo, pg_repo
+from app.repositories import folder_repo, mongo_repo, pg_repo
 from app.schemas.thumbnail_job_details import ThumbnailJobDetailsPayload
 from app.schemas.thumbnails import (
     ThumbnailFeedbackRequest,
@@ -44,6 +44,8 @@ def _job_row_to_public(
         "root_job_id": _as_uuid(job["root_job_id"]) if job.get("root_job_id") else None,
         "created_by": _as_uuid(job["created_by"]),
         "created_by_email": created_by_email,
+        "folder_id": _as_uuid(job["folder_id"]) if job.get("folder_id") else None,
+        "candidate_urls": job.get("candidate_urls"),
         "created_at": job["created_at"],
         "updated_at": job["updated_at"],
         "completed_at": job.get("completed_at"),
@@ -83,13 +85,34 @@ async def create_thumbnail_job(
     include_title: bool,
     creative_comments: str,
     model: str,
+    folder_id: uuid.UUID | None = None,
 ) -> ThumbnailJobCreatedResponse:
-    """``created_by`` is always ``user_id`` from the verified JWT."""
-    if model not in ("gptimage", "nanobanana"):
+    """``created_by`` is always ``user_id`` from the verified JWT.
+
+    ``folder_id`` (optional) pulls in that folder's persistent client-style
+    prompt, prepended to ``creative_comments`` before generation.
+    """
+    if model not in ("gptimage", "nanobanana", "fluxkontext"):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="model must be gptimage or nanobanana",
+            detail="model must be gptimage, nanobanana, or fluxkontext",
         )
+
+    if folder_id is not None:
+        folder = await folder_repo.get_folder(session, folder_id)
+        if folder is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Folder not found",
+            )
+        style_prompt = str(folder.get("style_prompt") or "").strip()
+        if style_prompt:
+            creative_comments = (
+                f"CLIENT STYLE (always apply): {style_prompt}\n\n{creative_comments}"
+                if creative_comments
+                else f"CLIENT STYLE (always apply): {style_prompt}"
+            )
+
     job_id = uuid.uuid4()
     jid_str = str(job_id)
     ref_bytes, ref_fn, ref_ct = reference
@@ -101,6 +124,7 @@ async def create_thumbnail_job(
         parent_job_id=None,
         root_job_id=job_id,
         iteration=1,
+        folder_id=folder_id,
     )
 
     ref_key = thumbnail_input_reference_key(jid_str, ref_fn, ref_ct)
@@ -145,10 +169,13 @@ async def list_thumbnail_jobs(
     limit: int,
     *,
     is_admin: bool = False,
+    folder_id: uuid.UUID | None = None,
 ) -> ThumbnailListResponse:
     """``is_admin`` lists thumbnail jobs across all members, not just ``user_id``."""
     filter_user_id = None if is_admin else user_id
-    rows = await pg_repo.list_jobs_by_user(session, filter_user_id, cursor, limit)
+    rows = await pg_repo.list_jobs_by_user(
+        session, filter_user_id, cursor, limit, folder_id=folder_id
+    )
     job_ids = [str(r["id"]) for r in rows]
     mongo_by_id = mongo_repo.get_details_many(job_ids)
     emails_by_id = await _creator_emails(session, rows) if is_admin else {}
@@ -190,6 +217,26 @@ async def get_thumbnail_job(
     return _job_row_to_public(job, mongo, created_by_email=email)
 
 
+async def select_thumbnail_candidate(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    job_id: uuid.UUID,
+    selected_url: str,
+) -> ThumbnailJobPublic:
+    """Owner picks one of the generated candidates; that becomes ``result_url``."""
+    job = await require_thumbnail_job_owner(session, job_id, user_id)
+    candidates = job.get("candidate_urls") or []
+    if job.get("status") != "awaiting_selection" or selected_url not in candidates:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Job is not awaiting selection, or selected_url is not one of its candidates",
+        )
+    await pg_repo.update_completed(session, job_id, selected_url)
+    updated = await pg_repo.get_job(session, job_id)
+    mongo = mongo_repo.get_details(str(job_id))
+    return _job_row_to_public(updated, mongo)
+
+
 async def submit_thumbnail_feedback(
     session: AsyncSession,
     user_id: uuid.UUID,
@@ -216,10 +263,22 @@ async def submit_thumbnail_feedback(
         parent_job_id=parent_job_id,
         root_job_id=root_uuid,
         iteration=iteration,
+        folder_id=parent.get("folder_id"),
     )
 
+    # Base every iteration's prompt on the ROOT job's original creative direction
+    # plus only the newest feedback — not the parent's, which may already carry
+    # earlier rounds' feedback stacked on top of each other. Stacking raw feedback
+    # across iterations feeds the model a growing, sometimes-contradictory
+    # transcript instead of a clean current instruction.
+    root_details = (
+        details
+        if str(root_uuid) == str(parent_job_id)
+        else (mongo_repo.get_details(str(root_uuid)) or details)
+    )
     merged = (
-        f"{details.get('creative_comments', '')}\n\n---\nFeedback: {body.feedback}"
+        f"{root_details.get('creative_comments', '')}\n\n"
+        f"Latest revision request: {body.feedback}"
     )
     payload: ThumbnailJobDetailsPayload = {
         "reference_image_url": str(details["reference_image_url"]),

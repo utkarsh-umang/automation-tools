@@ -66,3 +66,12 @@ def thumbnail_input_base_key(
 def thumbnail_s3_key(job_id: str) -> str:
     """Return the S3 object key for a thumbnail job (``thumbnails/{job_id}.png``)."""
     return f"{THUMBNAIL_S3_KEY_PREFIX}/{job_id}.png"
+
+
+def thumbnail_s3_candidate_key(job_id: str, index: int) -> str:
+    """S3 key for one of a job's generated candidates (``thumbnails/{job_id}/candidate-{index}.png``).
+
+    Deterministic per ``(job_id, index)`` so Celery retries overwrite the same
+    object, same idempotency guarantee as ``thumbnail_s3_key``.
+    """
+    return f"{THUMBNAIL_S3_KEY_PREFIX}/{job_id}/candidate-{index}.png"

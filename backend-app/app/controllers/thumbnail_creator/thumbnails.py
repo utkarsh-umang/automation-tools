@@ -17,6 +17,7 @@ from app.schemas.thumbnails import (
     ThumbnailJobCreatedResponse,
     ThumbnailJobPublic,
     ThumbnailListResponse,
+    ThumbnailSelectCandidateRequest,
 )
 from app.services import thumbnail_service
 
@@ -55,6 +56,7 @@ async def create_thumbnail(
     include_title: bool = Form(),
     creative_comments: str = Form(),
     model: str = Form(),
+    folder_id: uuid.UUID | None = Form(default=None),
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession = Depends(get_db_session),
 ) -> ThumbnailJobCreatedResponse:
@@ -76,6 +78,7 @@ async def create_thumbnail(
         include_title=include_title,
         creative_comments=creative_comments,
         model=model,
+        folder_id=folder_id,
     )
 
 
@@ -85,6 +88,7 @@ async def list_thumbnails(
     db: AsyncSession = Depends(get_db_session),
     cursor: uuid.UUID | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
+    folder_id: uuid.UUID | None = Query(None),
 ) -> ThumbnailListResponse:
     """ADMIN sees thumbnails from every member; MEMBER sees only their own."""
     return await thumbnail_service.list_thumbnail_jobs(
@@ -93,6 +97,20 @@ async def list_thumbnails(
         cursor,
         limit,
         is_admin=current_user.role == "ADMIN",
+        folder_id=folder_id,
+    )
+
+
+@router.post("/{job_id}/select", response_model=ThumbnailJobPublic)
+async def select_thumbnail_candidate(
+    job_id: uuid.UUID,
+    body: ThumbnailSelectCandidateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ThumbnailJobPublic:
+    """Owner picks one of the generated candidates as the final thumbnail."""
+    return await thumbnail_service.select_thumbnail_candidate(
+        db, uuid.UUID(current_user.id), job_id, body.selected_url
     )
 
 

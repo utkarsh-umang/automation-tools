@@ -12,6 +12,8 @@ export type ThumbnailJobPublic = {
     root_job_id: (string | null);
     created_by: string;
     created_by_email?: (string | null);
+    folder_id?: (string | null);
+    candidate_urls?: (Array<string> | null);
     created_at: string;
     updated_at: string;
     completed_at: (string | null);

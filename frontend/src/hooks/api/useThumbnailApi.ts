@@ -9,6 +9,7 @@ import {
   type Body_create_thumbnail_api_v1_thumbnails_thumbnail_post,
   type ThumbnailFeedbackRequest,
   type ThumbnailListResponse,
+  type ThumbnailSelectCandidateRequest,
 } from '@/client'
 import { getApiErrorMessage } from '@/hooks/api/useYoutubeApi'
 
@@ -25,9 +26,16 @@ export const thumbnailKeys = {
   history: (id: string) => [...thumbnailKeys.all, 'history', id] as const,
 }
 
-/** Terminal job statuses from the thumbnail pipeline (see backend `thumbnail_jobs.status`). */
+/**
+ * Terminal job statuses from the thumbnail pipeline (see backend `thumbnail_jobs.status`):
+ * no further automatic transition happens without a human action (retry / select-candidate).
+ */
 export function isThumbnailJobTerminal(status: string): boolean {
-  return status === 'completed' || status === 'failed'
+  return status === 'completed' || status === 'failed' || status === 'awaiting_selection'
+}
+
+export function isThumbnailJobAwaitingSelection(status: string): boolean {
+  return status === 'awaiting_selection'
 }
 
 const LIST_POLL_MS = 3000
@@ -82,6 +90,27 @@ export function useCreateThumbnailMutation() {
       ThumbnailCreatorService.createThumbnailApiV1ThumbnailsThumbnailPost(input),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: thumbnailKeys.list() })
+    },
+  })
+}
+
+export function useSelectThumbnailCandidateMutation() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      jobId,
+      body,
+    }: {
+      jobId: string
+      body: ThumbnailSelectCandidateRequest
+    }) =>
+      ThumbnailCreatorService.selectThumbnailCandidateApiV1ThumbnailsThumbnailJobIdSelectPost(
+        jobId,
+        body,
+      ),
+    onSuccess: (_, { jobId }) => {
+      void qc.invalidateQueries({ queryKey: thumbnailKeys.list() })
+      void qc.invalidateQueries({ queryKey: thumbnailKeys.job(jobId) })
     },
   })
 }

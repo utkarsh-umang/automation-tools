@@ -67,15 +67,17 @@ async def test_async_success_pipeline_order() -> None:
                         "model": "gptimage",
                     },
                 ):
-                    with patch(
-                        "ai_agents.run_thumbnail_agent",
+                    with patch.object(
+                        gen_mod, "run_thumbnail_agent"
                     ) as agent:
                         agent.return_value = {
-                            "image_bytes": b"\x89PNG\r\n",
+                            "images": [b"\x89PNG\r\n", b"\x89PNG\r\n2"],
                             "prompt_used": "prompt text",
                         }
                         with patch.object(
-                            gen_mod, "upload_thumbnail_png", return_value="https://s3/u"
+                            gen_mod,
+                            "upload_thumbnail_png_candidate",
+                            side_effect=lambda jid, i, img: f"https://s3/u{i}",
                         ) as up:
                             with patch.object(
                                 gen_mod.mongo_repo,
@@ -83,7 +85,7 @@ async def test_async_success_pipeline_order() -> None:
                             ) as mp:
                                 with patch.object(
                                     gen_mod.pg_repo,
-                                    "update_completed",
+                                    "update_candidates",
                                     new_callable=AsyncMock,
                                 ) as uc:
                                     await gen_mod._async_generate_thumbnail(
@@ -92,15 +94,19 @@ async def test_async_success_pipeline_order() -> None:
 
                                     us.assert_awaited_once()
                                     agent.assert_called_once()
-                                    up.assert_called_once_with(
-                                        job_id, b"\x89PNG\r\n"
-                                    )
+                                    assert agent.call_args[1]["num_candidates"] == 2
+                                    assert up.call_count == 2
+                                    up.assert_any_call(job_id, 0, b"\x89PNG\r\n")
+                                    up.assert_any_call(job_id, 1, b"\x89PNG\r\n2")
                                     mp.assert_called_once_with(
                                         job_id, "prompt text"
                                     )
                                     assert uc.await_args is not None
                                     assert uc.await_args.args[1] == uid
-                                    assert uc.await_args.args[2] == "https://s3/u"
+                                    assert uc.await_args.args[2] == [
+                                        "https://s3/u0",
+                                        "https://s3/u1",
+                                    ]
 
 
 @pytest.mark.asyncio
@@ -132,11 +138,11 @@ async def test_async_uses_s3_keys_for_agent_urls() -> None:
                         "model": "gptimage",
                     },
                 ):
-                    with patch(
-                        "ai_agents.run_thumbnail_agent",
+                    with patch.object(
+                        gen_mod, "run_thumbnail_agent"
                     ) as agent:
                         agent.return_value = {
-                            "image_bytes": b"\x89PNG\r\n",
+                            "images": [b"\x89PNG\r\n", b"\x89PNG\r\n2"],
                             "prompt_used": None,
                         }
                         with patch.object(
@@ -145,14 +151,16 @@ async def test_async_uses_s3_keys_for_agent_urls() -> None:
                             side_effect=lambda k: f"resolved:{k}",
                         ) as gsu:
                             with patch.object(
-                                gen_mod, "upload_thumbnail_png", return_value="https://s3/u"
+                                gen_mod,
+                                "upload_thumbnail_png_candidate",
+                                side_effect=lambda jid, i, img: "https://s3/u",
                             ):
                                 with patch.object(
                                     gen_mod.mongo_repo, "update_prompt_used"
                                 ) as mp:
                                     with patch.object(
                                         gen_mod.pg_repo,
-                                        "update_completed",
+                                        "update_candidates",
                                         new_callable=AsyncMock,
                                     ):
                                         await gen_mod._async_generate_thumbnail(
@@ -193,19 +201,21 @@ async def test_async_calls_nanobanana_model() -> None:
                         "model": "nanobanana",
                     },
                 ):
-                    with patch(
-                        "ai_agents.run_thumbnail_agent",
+                    with patch.object(
+                        gen_mod, "run_thumbnail_agent"
                     ) as agent:
-                        agent.return_value = {"image_bytes": b"x", "prompt_used": "p"}
+                        agent.return_value = {"images": [b"x", b"y"], "prompt_used": "p"}
                         with patch.object(
-                            gen_mod, "upload_thumbnail_png", return_value="u"
+                            gen_mod,
+                            "upload_thumbnail_png_candidate",
+                            side_effect=lambda jid, i, img: "u",
                         ):
                             with patch.object(
                                 gen_mod.mongo_repo, "update_prompt_used"
                             ):
                                 with patch.object(
                                     gen_mod.pg_repo,
-                                    "update_completed",
+                                    "update_candidates",
                                     new_callable=AsyncMock,
                                 ):
                                     await gen_mod._async_generate_thumbnail(

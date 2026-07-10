@@ -6,16 +6,27 @@ import {
   getApiErrorMessage,
   useCreateThumbnailMutation,
 } from '@/hooks/api/useThumbnailApi'
+import {
+  useCreateFolderMutation,
+  useFolderListQuery,
+  useUpdateFolderMutation,
+} from '@/hooks/api/useFolderApi'
 
 import '@uppy/core/css/style.min.css'
 import '@uppy/dashboard/css/style.min.css'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
+// Flux Kontext first (and default) — cheapest per-generation, use it first and
+// only reach for the pricier models below if a result doesn't look right.
 const MODEL_OPTIONS = [
+  { value: 'fluxkontext', label: 'Flux Kontext (cheapest — try first)' },
   { value: 'gptimage', label: 'GPT Image' },
   { value: 'nanobanana', label: 'Nano Banana' },
 ] as const
+
+const NO_FOLDER = ''
+const NEW_FOLDER = '__new__'
 
 type CreateThumbnailProps = {
   onCreated?: () => void
@@ -25,8 +36,45 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
   const [title, setTitle] = useState('')
   const [includeText, setIncludeText] = useState(true)
   const [creativeComments, setCreativeComments] = useState('')
-  const [model, setModel] = useState<(typeof MODEL_OPTIONS)[number]['value']>('gptimage')
+  const [model, setModel] = useState<(typeof MODEL_OPTIONS)[number]['value']>('fluxkontext')
   const [formError, setFormError] = useState<string | null>(null)
+
+  const { data: folderData } = useFolderListQuery()
+  const folders = folderData?.folders ?? []
+  const [folderSelection, setFolderSelection] = useState<string>(NO_FOLDER)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [newFolderStyle, setNewFolderStyle] = useState('')
+  const [editingStyle, setEditingStyle] = useState('')
+  const [editingStyleDirty, setEditingStyleDirty] = useState(false)
+  const createFolderMutation = useCreateFolderMutation()
+  const updateFolderMutation = useUpdateFolderMutation()
+
+  const selectedFolder = folders.find((f) => f.id === folderSelection)
+
+  useEffect(() => {
+    setEditingStyle(selectedFolder?.style_prompt ?? '')
+    setEditingStyleDirty(false)
+  }, [selectedFolder?.id, selectedFolder?.style_prompt])
+
+  async function handleCreateFolder() {
+    if (!newFolderName.trim()) return
+    const folder = await createFolderMutation.mutateAsync({
+      name: newFolderName.trim(),
+      style_prompt: newFolderStyle.trim(),
+    })
+    setFolderSelection(folder.id)
+    setNewFolderName('')
+    setNewFolderStyle('')
+  }
+
+  async function handleSaveFolderStyle() {
+    if (!selectedFolder) return
+    await updateFolderMutation.mutateAsync({
+      folderId: selectedFolder.id,
+      body: { style_prompt: editingStyle },
+    })
+    setEditingStyleDirty(false)
+  }
 
   const referenceContainerRef = useRef<HTMLDivElement>(null)
   const baseContainerRef = useRef<HTMLDivElement>(null)
@@ -100,6 +148,7 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
         include_title: includeText,
         creative_comments: creativeComments,
         model,
+        folder_id: folderSelection && folderSelection !== NEW_FOLDER ? folderSelection : undefined,
       })
       refUppy?.cancelAll()
       baseUppy?.cancelAll()
@@ -136,6 +185,96 @@ export function CreateThumbnail({ onCreated }: CreateThumbnailProps) {
       </div>
 
       <div className="space-y-6 px-5 py-5">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
+            Client folder (optional)
+          </label>
+          <select
+            value={folderSelection}
+            onChange={(e) => setFolderSelection(e.target.value)}
+            className="w-full rounded-lg px-3 py-2.5 text-sm outline-none transition-all"
+            style={{ border: '1px solid #e5e7eb', color: '#111827', backgroundColor: '#f9fafb' }}
+          >
+            <option value={NO_FOLDER}>No folder</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+            <option value={NEW_FOLDER}>+ New folder…</option>
+          </select>
+          <p className="mt-1 text-xs" style={{ color: '#6b7280' }}>
+            Folders are shared with the whole team — a folder's style note is added to
+            every thumbnail created inside it, so a client's preferred look travels with
+            the client, not just with you.
+          </p>
+
+          {folderSelection === NEW_FOLDER && (
+            <div
+              className="mt-3 space-y-2.5 rounded-lg p-3.5"
+              style={{ border: '1px dashed #d1d5db', backgroundColor: '#f9fafb' }}
+            >
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder="Client name"
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+                style={{ border: '1px solid #e5e7eb', color: '#111827', backgroundColor: '#ffffff' }}
+              />
+              <textarea
+                value={newFolderStyle}
+                onChange={(e) => setNewFolderStyle(e.target.value)}
+                rows={2}
+                placeholder="Client's preferred visual style, always applied to their thumbnails…"
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-y"
+                style={{ border: '1px solid #e5e7eb', color: '#111827', backgroundColor: '#ffffff' }}
+              />
+              <button
+                type="button"
+                onClick={() => void handleCreateFolder()}
+                disabled={!newFolderName.trim() || createFolderMutation.isPending}
+                className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                style={{ backgroundColor: '#2563eb' }}
+              >
+                {createFolderMutation.isPending ? 'Creating…' : 'Create folder'}
+              </button>
+            </div>
+          )}
+
+          {selectedFolder && (
+            <div
+              className="mt-3 space-y-2 rounded-lg p-3.5"
+              style={{ border: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}
+            >
+              <label className="block text-xs font-medium" style={{ color: '#374151' }}>
+                {selectedFolder.name}'s style note (shared — editing this changes it for everyone)
+              </label>
+              <textarea
+                value={editingStyle}
+                onChange={(e) => {
+                  setEditingStyle(e.target.value)
+                  setEditingStyleDirty(true)
+                }}
+                rows={2}
+                className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-y"
+                style={{ border: '1px solid #e5e7eb', color: '#111827', backgroundColor: '#ffffff' }}
+              />
+              {editingStyleDirty && (
+                <button
+                  type="button"
+                  onClick={() => void handleSaveFolderStyle()}
+                  disabled={updateFolderMutation.isPending}
+                  className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  style={{ backgroundColor: '#2563eb' }}
+                >
+                  {updateFolderMutation.isPending ? 'Saving…' : 'Save style note'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         <div>
           <label className="mb-1.5 block text-sm font-medium" style={{ color: '#111827' }}>
             Thumbnail title <span style={{ color: '#be123c' }}>*</span>

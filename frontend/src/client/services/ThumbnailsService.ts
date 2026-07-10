@@ -8,6 +8,7 @@ import type { ThumbnailHistoryResponse } from '../models/ThumbnailHistoryRespons
 import type { ThumbnailJobCreatedResponse } from '../models/ThumbnailJobCreatedResponse';
 import type { ThumbnailJobPublic } from '../models/ThumbnailJobPublic';
 import type { ThumbnailListResponse } from '../models/ThumbnailListResponse';
+import type { ThumbnailSelectCandidateRequest } from '../models/ThumbnailSelectCandidateRequest';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
@@ -37,12 +38,14 @@ export class ThumbnailsService {
      * ADMIN sees thumbnails from every member; MEMBER sees only their own.
      * @param cursor
      * @param limit
+     * @param folderId
      * @returns ThumbnailListResponse Successful Response
      * @throws ApiError
      */
     public static listThumbnailsApiV1ThumbnailsThumbnailGet(
         cursor?: (string | null),
         limit: number = 20,
+        folderId?: (string | null),
     ): CancelablePromise<ThumbnailListResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -50,7 +53,33 @@ export class ThumbnailsService {
             query: {
                 'cursor': cursor,
                 'limit': limit,
+                'folder_id': folderId,
             },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Select Thumbnail Candidate
+     * Owner picks one of the generated candidates as the final thumbnail.
+     * @param jobId
+     * @param requestBody
+     * @returns ThumbnailJobPublic Successful Response
+     * @throws ApiError
+     */
+    public static selectThumbnailCandidateApiV1ThumbnailsThumbnailJobIdSelectPost(
+        jobId: string,
+        requestBody: ThumbnailSelectCandidateRequest,
+    ): CancelablePromise<ThumbnailJobPublic> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/thumbnails/thumbnail/{job_id}/select',
+            path: {
+                'job_id': jobId,
+            },
+            body: requestBody,
+            mediaType: 'application/json',
             errors: {
                 422: `Validation Error`,
             },

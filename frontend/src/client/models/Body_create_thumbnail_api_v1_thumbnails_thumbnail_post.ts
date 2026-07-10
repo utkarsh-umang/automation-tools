@@ -9,5 +9,6 @@ export type Body_create_thumbnail_api_v1_thumbnails_thumbnail_post = {
     include_title: boolean;
     creative_comments: string;
     model: string;
+    folder_id?: (string | null);
 };
 

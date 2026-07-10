@@ -10,6 +10,7 @@ export namespace ThumbnailFeedbackRequest {
     export enum model {
         GPTIMAGE = 'gptimage',
         NANOBANANA = 'nanobanana',
+        FLUXKONTEXT = 'fluxkontext',
     }
 }
 

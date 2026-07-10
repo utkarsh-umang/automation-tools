@@ -25,6 +25,8 @@ def _job_to_dict(job: ThumbnailJob) -> dict[str, Any]:
         "iteration": job.iteration,
         "result_url": job.result_url,
         "error": job.error,
+        "folder_id": job.folder_id,
+        "candidate_urls": job.candidate_urls,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
         "completed_at": job.completed_at,
@@ -38,6 +40,7 @@ async def create_job(
     parent_job_id: uuid.UUID | None,
     root_job_id: uuid.UUID | None,
     iteration: int,
+    folder_id: uuid.UUID | None = None,
 ) -> None:
     job = ThumbnailJob(
         id=job_id,
@@ -45,6 +48,7 @@ async def create_job(
         parent_job_id=parent_job_id,
         root_job_id=root_job_id,
         iteration=iteration,
+        folder_id=folder_id,
     )
     session.add(job)
     await session.flush()
@@ -80,6 +84,21 @@ async def update_completed(
     )
 
 
+async def update_candidates(
+    session: AsyncSession, job_id: uuid.UUID, candidate_urls: list[str]
+) -> None:
+    """Generation produced candidates; job now awaits the caller picking one."""
+    await session.execute(
+        update(ThumbnailJob)
+        .where(ThumbnailJob.id == job_id)
+        .values(
+            candidate_urls=candidate_urls,
+            status="awaiting_selection",
+            updated_at=func.now(),
+        )
+    )
+
+
 async def update_failed(
     session: AsyncSession, job_id: uuid.UUID, error: str
 ) -> None:
@@ -95,11 +114,14 @@ async def list_jobs_by_user(
     user_id: uuid.UUID | None,
     cursor: uuid.UUID | None,
     limit: int,
+    folder_id: uuid.UUID | None = None,
 ) -> list[dict[str, Any]]:
     """``user_id=None`` lists jobs across all users (ADMIN-only callers)."""
     stmt = select(ThumbnailJob)
     if user_id is not None:
         stmt = stmt.where(ThumbnailJob.created_by == user_id)
+    if folder_id is not None:
+        stmt = stmt.where(ThumbnailJob.folder_id == folder_id)
     if cursor is not None:
         cur_job = await session.get(ThumbnailJob, cursor)
         if cur_job is None:

@@ -3,7 +3,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, text
+from sqlalchemy import ARRAY, Column, DateTime, Text, text
 from sqlmodel import Field, SQLModel
 
 
@@ -28,6 +28,14 @@ class ThumbnailJob(SQLModel, table=True):
     iteration: int = Field(default=1)
     result_url: str | None = Field(default=None)
     error: str | None = Field(default=None)
+    folder_id: uuid.UUID | None = Field(
+        default=None,
+        foreign_key="thumbnail_folders.id",
+    )
+    candidate_urls: list[str] | None = Field(
+        default=None,
+        sa_column=Column(ARRAY(Text()), nullable=True),
+    )
     created_at: datetime = Field(
         default_factory=_utc_now,
         sa_column=Column(

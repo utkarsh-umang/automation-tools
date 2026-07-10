@@ -1,11 +1,14 @@
-"""Celery task: generate thumbnail via ``ai_agents``, upload to S3, persist state.
+"""Celery task: generate thumbnail candidates via ``ai_agents``, upload to S3, persist state.
 
-Flow (SBL-13): Mongo details → PG ``processing`` → ``run_thumbnail_agent`` → S3 →
-Mongo ``prompt_used`` → PG ``completed``. Idempotent if already completed with
-``result_url`` (SBL-13).
+Flow (SBL-13): Mongo details → PG ``processing`` → ``run_thumbnail_agent``
+(``num_candidates=2``, generated concurrently) → S3 (one object per candidate)
+→ Mongo ``prompt_used`` → PG ``awaiting_selection`` with ``candidate_urls`` set.
+The caller picks one via ``thumbnail_service.select_thumbnail_candidate``, which
+moves the job to ``completed``. Idempotent if already ``completed`` with
+``result_url``, or already ``awaiting_selection`` with candidates set (SBL-13).
 
 Retries (SBL-14): ``max_retries=2``, ``countdown=10``; final failure stores up to
-500 chars in PG ``error``. Time limits (SBL-16): soft 110s / hard 120s; soft
+500 chars in PG ``error``. Time limits (SBL-16): soft 150s / hard 170s; soft
 timeout marks PG failed with a fixed message.
 """
 
@@ -23,14 +26,15 @@ from app.core.error_reporting import capture_thumbnail_task_exhausted_retries
 from app.db.session import AsyncSessionLocal, engine
 from app.repositories import mongo_repo, pg_repo
 from app.services.s3_upload import get_s3_object_read_url
-from app.services.thumbnail_s3 import upload_thumbnail_png
+from app.services.thumbnail_s3 import upload_thumbnail_png_candidate
 
 from ai_agents import run_thumbnail_agent
 
 logger = logging.getLogger(__name__)
 
 _MAX_PG_ERROR_LEN = 500
-_TIMEOUT_USER_MESSAGE = "Task timed out after 110s"
+_TIMEOUT_USER_MESSAGE = "Task timed out after 150s"
+_NUM_CANDIDATES = 2
 
 
 def _truncate_error_message(exc: BaseException) -> str:
@@ -82,6 +86,12 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
                 job_id,
             )
             return
+        if job.get("status") == "awaiting_selection" and job.get("candidate_urls"):
+            logger.info(
+                "thumbnail.generate event=skip_idempotent_awaiting_selection job_id=%s",
+                job_id,
+            )
+            return
 
     details = mongo_repo.get_details(job_id)
     if not details:
@@ -127,6 +137,7 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         title=details["title"],
         include_title=bool(details["include_title"]),
         creative_comments=details["creative_comments"],
+        num_candidates=_NUM_CANDIDATES,
     )
     agent_ms = int((time.perf_counter() - t_agent) * 1000)
     logger.info(
@@ -137,21 +148,24 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         agent_ms,
     )
 
-    raw_bytes = result.get("image_bytes")
-    if not isinstance(raw_bytes, bytes | bytearray):
-        raise TypeError("run_thumbnail_agent did not return bytes for image_bytes")
-    image_bytes = bytes(raw_bytes)
+    raw_images = result.get("images")
+    if not isinstance(raw_images, list) or not raw_images:
+        raise TypeError("run_thumbnail_agent did not return a non-empty images list")
+    images = [bytes(img) for img in raw_images]
     prompt_used = result.get("prompt_used")
     prompt_str = None if prompt_used is None else str(prompt_used)
 
     t_s3 = time.perf_counter()
-    s3_url = upload_thumbnail_png(job_id, image_bytes)
+    candidate_urls = [
+        upload_thumbnail_png_candidate(job_id, i, img) for i, img in enumerate(images)
+    ]
     s3_ms = int((time.perf_counter() - t_s3) * 1000)
     logger.info(
         "thumbnail.generate event=s3_upload_completed job_id=%s model=%s "
-        "duration_ms=%s",
+        "candidates=%s duration_ms=%s",
         job_id,
         model,
+        len(candidate_urls),
         s3_ms,
     )
 
@@ -159,15 +173,16 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
         mongo_repo.update_prompt_used(job_id, prompt_str)
 
     async with AsyncSessionLocal() as session:
-        await pg_repo.update_completed(session, uid, s3_url)
+        await pg_repo.update_candidates(session, uid, candidate_urls)
         await session.commit()
 
     total_ms = int((time.perf_counter() - t0) * 1000)
     logger.info(
         "thumbnail.generate event=task_completed job_id=%s model=%s "
-        "total_duration_ms=%s",
+        "candidates=%s total_duration_ms=%s",
         job_id,
         model,
+        len(candidate_urls),
         total_ms,
     )
 
@@ -176,8 +191,11 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
     bind=True,
     name="thumbnail.generate_thumbnail",
     max_retries=2,
-    soft_time_limit=110,
-    time_limit=120,
+    # Generating 2 candidates concurrently should stay close to single-candidate
+    # wall-clock, but with headroom for network contention between the two
+    # in-flight generation calls plus two S3 uploads instead of one.
+    soft_time_limit=150,
+    time_limit=170,
 )
 def generate_thumbnail_task(self, job_id: str) -> None:
     """Background thumbnail generation; sole argument ``job_id`` (UUID string)."""

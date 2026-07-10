@@ -7,11 +7,12 @@ import {
   ChevronDown,
   Images,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ThumbnailFeedbackRequest } from '@/client'
 import {
   getApiErrorMessage,
   isThumbnailJobTerminal,
+  useSelectThumbnailCandidateMutation,
   useThumbnailFeedbackMutation,
   useThumbnailHistoryQuery,
   useThumbnailJobQuery,
@@ -25,23 +26,34 @@ type ThumbnailDetailModalProps = {
 function modelLabel(model: string | null | undefined) {
   if (model === 'gptimage') return 'GPT Image'
   if (model === 'nanobanana') return 'Nano Banana'
+  if (model === 'fluxkontext') return 'Flux Kontext'
   return model ?? '—'
 }
 
 export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalProps) {
-  const { data: job, isLoading, isError, error, refetch } = useThumbnailJobQuery(jobId)
-  const { data: historyData } = useThumbnailHistoryQuery(jobId)
+  // Iteration history entries are clickable — clicking one re-points this same
+  // modal at that job instead of the one it was opened with.
+  const [viewedJobId, setViewedJobId] = useState(jobId)
+  useEffect(() => {
+    setViewedJobId(jobId)
+  }, [jobId])
+
+  const { data: job, isLoading, isError, error, refetch } = useThumbnailJobQuery(viewedJobId)
+  const { data: historyData } = useThumbnailHistoryQuery(viewedJobId)
   const feedbackMutation = useThumbnailFeedbackMutation()
+  const selectMutation = useSelectThumbnailCandidateMutation()
 
   const [feedbackText, setFeedbackText] = useState('')
   const [feedbackModel, setFeedbackModel] = useState<ThumbnailFeedbackRequest.model>(
-    ThumbnailFeedbackRequest.model.GPTIMAGE,
+    ThumbnailFeedbackRequest.model.FLUXKONTEXT,
   )
   const [feedbackError, setFeedbackError] = useState<string | null>(null)
   const [feedbackDone, setFeedbackDone] = useState(false)
+  const [selectError, setSelectError] = useState<string | null>(null)
 
   const canRequestRevision =
     job && isThumbnailJobTerminal(job.status) && job.status === 'completed' && Boolean(job.result_url)
+  const isAwaitingSelection = job?.status === 'awaiting_selection' && Boolean(job.candidate_urls?.length)
 
   async function handleFeedbackSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -53,7 +65,7 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
     }
     try {
       await feedbackMutation.mutateAsync({
-        jobId,
+        jobId: viewedJobId,
         body: {
           feedback: feedbackText.trim(),
           model: feedbackModel,
@@ -63,6 +75,15 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
       setFeedbackDone(true)
     } catch (err) {
       setFeedbackError(getApiErrorMessage(err))
+    }
+  }
+
+  async function handleSelectCandidate(url: string) {
+    setSelectError(null)
+    try {
+      await selectMutation.mutateAsync({ jobId: viewedJobId, body: { selected_url: url } })
+    } catch (err) {
+      setSelectError(getApiErrorMessage(err))
     }
   }
 
@@ -76,8 +97,8 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
             aria-hidden
           />
 
-          {/* Generated image — fixed height, never shrinks */}
-          <div className="relative z-10 flex h-[min(46vh,400px)] shrink-0 items-center justify-center px-8 py-8">
+          {/* Generated image(s) — fixed height, never shrinks */}
+          <div className="relative z-10 flex min-h-[min(46vh,400px)] shrink-0 items-center justify-center px-8 py-8">
             {isLoading && (
               <Loader2 className="w-10 h-10 text-blue-400 animate-spin" aria-label="Loading" />
             )}
@@ -89,14 +110,43 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
                 </button>
               </p>
             )}
-            {!isLoading && !isError && job?.result_url && (
+            {!isLoading && !isError && isAwaitingSelection && (
+              <div className="w-full">
+                <p className="mb-3 text-center text-sm font-semibold text-white">
+                  Pick the version you want to keep
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  {job?.candidate_urls?.map((url, i) => (
+                    <div key={url} className="flex flex-col items-center gap-2">
+                      <img
+                        src={url}
+                        alt={`Candidate ${i + 1}`}
+                        className="h-56 w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleSelectCandidate(url)}
+                        disabled={selectMutation.isPending}
+                        className="rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-bold px-4 py-2"
+                      >
+                        {selectMutation.isPending ? 'Saving…' : `Use this one`}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {selectError && (
+                  <p className="mt-3 text-center text-xs text-red-300">{selectError}</p>
+                )}
+              </div>
+            )}
+            {!isLoading && !isError && !isAwaitingSelection && job?.result_url && (
               <img
                 src={job.result_url}
                 alt="Generated thumbnail"
                 className="h-full w-full rounded-2xl object-contain shadow-2xl ring-1 ring-white/10"
               />
             )}
-            {!isLoading && !isError && job && !job.result_url && (
+            {!isLoading && !isError && !isAwaitingSelection && job && !job.result_url && (
               <div className="text-center text-gray-300 text-sm px-6">
                 <p className="font-semibold text-white mb-1">{job.status}</p>
                 {job.error && <p className="text-red-300">{job.error}</p>}
@@ -224,15 +274,23 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
                 </label>
                 <ul className="space-y-2 max-h-40 overflow-y-auto">
                   {historyData.jobs.map((h) => (
-                    <li
-                      key={h.id}
-                      className="flex items-center gap-2 text-xs bg-gray-50 rounded-lg px-3 py-2 border border-gray-100"
-                    >
-                      <span className="font-semibold text-gray-700">#{h.iteration}</span>
-                      <span className="text-gray-500 uppercase">{h.status}</span>
-                      {h.id === jobId && (
-                        <span className="text-blue-600 font-medium ml-auto">current</span>
-                      )}
+                    <li key={h.id}>
+                      <button
+                        type="button"
+                        onClick={() => setViewedJobId(h.id)}
+                        className="flex w-full items-center gap-2 text-xs rounded-lg px-3 py-2 border transition-colors"
+                        style={
+                          h.id === viewedJobId
+                            ? { backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }
+                            : { backgroundColor: '#f9fafb', borderColor: '#f3f4f6' }
+                        }
+                      >
+                        <span className="font-semibold text-gray-700">#{h.iteration}</span>
+                        <span className="text-gray-500 uppercase">{h.status}</span>
+                        {h.id === viewedJobId && (
+                          <span className="text-blue-600 font-medium ml-auto">viewing</span>
+                        )}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -264,6 +322,7 @@ export function ThumbnailDetailModal({ jobId, onClose }: ThumbnailDetailModalPro
                   disabled={!canRequestRevision || feedbackMutation.isPending}
                   className="rounded-lg border border-gray-200 px-2 py-1.5 text-xs font-medium"
                 >
+                  <option value={ThumbnailFeedbackRequest.model.FLUXKONTEXT}>Flux Kontext</option>
                   <option value={ThumbnailFeedbackRequest.model.GPTIMAGE}>GPT Image</option>
                   <option value={ThumbnailFeedbackRequest.model.NANOBANANA}>Nano Banana</option>
                 </select>

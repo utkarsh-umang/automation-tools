@@ -113,9 +113,9 @@ export function YourThumbnails() {
                   className="w-40 shrink-0 bg-black relative flex items-center justify-center p-1 border-r"
                   style={{ borderColor: '#e5e7eb' }}
                 >
-                  {item.result_url ? (
+                  {item.result_url || item.candidate_urls?.[0] ? (
                     <img
-                      src={item.result_url}
+                      src={item.result_url ?? item.candidate_urls![0]}
                       alt={item.title ?? 'Thumbnail'}
                       className="w-full h-full object-cover rounded shadow-sm opacity-90 transition-opacity hover:opacity-100"
                     />
@@ -124,6 +124,14 @@ export function YourThumbnails() {
                       {item.status}
                     </div>
                   )}
+                  {!item.result_url && item.candidate_urls?.length ? (
+                    <span
+                      className="absolute bottom-1 left-1 right-1 rounded px-1.5 py-0.5 text-center text-[9px] font-semibold uppercase"
+                      style={{ backgroundColor: 'rgba(180,83,9,0.85)', color: '#fff' }}
+                    >
+                      Pick one
+                    </span>
+                  ) : null}
                 </div>
                 <div className="p-4 flex flex-col justify-between flex-1 min-w-0">
                   <div>

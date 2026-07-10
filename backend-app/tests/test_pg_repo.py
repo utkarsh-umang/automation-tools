@@ -189,6 +189,8 @@ def test_job_to_dict_covers_keys() -> None:
         "iteration",
         "result_url",
         "error",
+        "folder_id",
+        "candidate_urls",
         "created_at",
         "updated_at",
         "completed_at",

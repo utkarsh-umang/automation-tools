@@ -11,12 +11,16 @@ from pydantic import BaseModel
 
 class ThumbnailFeedbackRequest(BaseModel):
     feedback: str
-    model: Literal["gptimage", "nanobanana"]
+    model: Literal["gptimage", "nanobanana", "fluxkontext"]
 
 
 class ThumbnailJobCreatedResponse(BaseModel):
     id: uuid.UUID
     status: str
+
+
+class ThumbnailSelectCandidateRequest(BaseModel):
+    selected_url: str
 
 
 class ThumbnailJobPublic(BaseModel):
@@ -29,6 +33,8 @@ class ThumbnailJobPublic(BaseModel):
     root_job_id: uuid.UUID | None
     created_by: uuid.UUID
     created_by_email: str | None = None
+    folder_id: uuid.UUID | None = None
+    candidate_urls: list[str] | None = None
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None
