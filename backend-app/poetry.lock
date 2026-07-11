@@ -28,8 +28,8 @@ python-dotenv = "*"
 [package.source]
 type = "git"
 url = "https://github.com/utkarsh-umang/ai-agents-service.git"
-reference = "HEAD"
-resolved_reference = "fdebbf7ebd1314622a91e2edc27a6a812a4b45f6"
+reference = "thumbnail-stable"
+resolved_reference = "5de2314d2a33b5b720fc713068b98c187d5f8d99"
 
 [[package]]
 name = "aiofiles"
@@ -6984,4 +6984,4 @@ observability = ["sentry-sdk"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "210b603e6068519a47bbd1ca14c7c4422a081b67c852ffc9aabf421f5efb1eb7"
+content-hash = "ff3bdf834e81a20bc654b7e030ea7159d3d8a9be83488ccbeaa4893522fa9bc5"
