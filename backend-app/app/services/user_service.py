@@ -51,3 +51,8 @@ async def get_users_by_ids(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.
         return {}
     result = await db.execute(select(User).where(User.id.in_(set(ids))))
     return {user.id: user for user in result.scalars().all()}
+
+
+async def list_users(db: AsyncSession) -> list[User]:
+    result = await db.execute(select(User).order_by(User.email.asc()))
+    return list(result.scalars().all())

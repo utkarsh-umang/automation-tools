@@ -1,3 +1,4 @@
+import { Users } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import logo from '@/assets/logo.png'
 import { toolsForRole } from '@/config/tools'
@@ -99,6 +100,18 @@ export function Sidebar() {
             </span>
           </NavLink>
         ))}
+
+        {user?.role === 'ADMIN' && (
+          <>
+            <div className="my-2 border-t px-1" style={{ borderColor: 'rgba(37,99,235,0.2)' }} aria-hidden />
+            <NavLink to="/admin/users" className={navLinkClass} style={navLinkStyle}>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={iconWrapStyle}>
+                <Users className="h-4 w-4" style={{ color: '#93c5fd' }} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">Manage Users</span>
+            </NavLink>
+          </>
+        )}
       </nav>
     </aside>
   )

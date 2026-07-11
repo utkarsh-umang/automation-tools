@@ -9,7 +9,7 @@ from app.core.auth import CurrentUser, get_current_user, require_roles
 from app.db.session import get_db_session
 from app.models.user import UserRole
 from app.schemas.auth import UserCreate, UserResponse
-from app.services.user_service import count_users, create_user, get_user_by_id
+from app.services.user_service import count_users, create_user, get_user_by_id, list_users
 
 router = APIRouter()
 
@@ -27,6 +27,19 @@ async def get_me(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserResponse.model_validate(user)
+
+
+@router.get(
+    "",
+    response_model=list[UserResponse],
+    summary="List all users (ADMIN only)",
+)
+async def list_all_users(
+    db: AsyncSession = Depends(get_db_session),
+    _: CurrentUser = Depends(require_roles("ADMIN")),
+) -> list[UserResponse]:
+    users = await list_users(db)
+    return [UserResponse.model_validate(u) for u in users]
 
 
 @router.post(

@@ -3,6 +3,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { AdminRoute } from '@/components/AdminRoute'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { ScrollToTop } from '@/components/ScrollToTop'
+import { AdminUsers } from '@/pages/AdminUsers'
 import { ComingSoonScreen } from '@/pages/ComingSoonScreen'
 import { Dashboard } from '@/pages/Dashboard'
 import { Login } from '@/pages/Login'
@@ -36,6 +37,15 @@ function App() {
           {/* MEMBER accounts are restricted to the thumbnail creator above — everything
               below is ADMIN-only, mirroring the backend's require_roles("ADMIN") gating. */}
           <Route element={<AdminRoute />}>
+            <Route
+              path="/admin/users"
+              element={
+                <AppShell breadcrumb="Manage Users">
+                  <AdminUsers />
+                </AppShell>
+              }
+            />
+
             <Route path="/youtube-script" element={<YouTubeScriptLayout />}>
               <Route index element={<YouTubeScriptTool />} />
               <Route path="batch/:batchId" element={<BatchDetailPage />} />

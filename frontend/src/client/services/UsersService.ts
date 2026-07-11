@@ -20,25 +20,14 @@ export class UsersService {
         });
     }
     /**
-     * Bootstrap first ADMIN (only works when no users exist)
-     * Create the very first ADMIN user when the users table is empty.
-     * This endpoint is unauthenticated intentionally — use it once from the
-     * FastAPI docs to bootstrap the system, then it will reject all subsequent calls.
-     * @param requestBody
+     * List all users (ADMIN only)
      * @returns UserResponse Successful Response
      * @throws ApiError
      */
-    public static seedAdminApiV1UsersSeedPost(
-        requestBody: UserCreate,
-    ): CancelablePromise<UserResponse> {
+    public static listAllUsersApiV1UsersGet(): CancelablePromise<Array<UserResponse>> {
         return __request(OpenAPI, {
-            method: 'POST',
-            url: '/api/v1/users/seed',
-            body: requestBody,
-            mediaType: 'application/json',
-            errors: {
-                422: `Validation Error`,
-            },
+            method: 'GET',
+            url: '/api/v1/users',
         });
     }
     /**
@@ -54,6 +43,28 @@ export class UsersService {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/api/v1/users',
+            body: requestBody,
+            mediaType: 'application/json',
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Bootstrap first ADMIN (only works when no users exist)
+     * Create the very first ADMIN user when the users table is empty.
+     * This endpoint is unauthenticated intentionally — use it once from the
+     * FastAPI docs to bootstrap the system, then it will reject all subsequent calls.
+     * @param requestBody
+     * @returns UserResponse Successful Response
+     * @throws ApiError
+     */
+    public static seedAdminApiV1UsersSeedPost(
+        requestBody: UserCreate,
+    ): CancelablePromise<UserResponse> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/api/v1/users/seed',
             body: requestBody,
             mediaType: 'application/json',
             errors: {
