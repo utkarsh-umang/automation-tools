@@ -1,7 +1,8 @@
 """Ordered YouTube Data API keys from configuration.
 
-Primary key is required when YouTube features run; optional ``_2`` is used
-after the primary key's daily quota is exhausted for the same batch term.
+Primary key is required when YouTube features run; optional ``_2``..``_4`` are
+used in order after the previous key's daily quota is exhausted for the same
+batch term.
 """
 
 from app.core.config import config
@@ -9,12 +10,15 @@ from app.core.config import config
 
 def _collect_keys() -> list[str]:
     keys: list[str] = []
-    primary = (config.YOUTUBE_API_KEY_V3 or "").strip()
-    if primary:
-        keys.append(primary)
-    secondary = (config.YOUTUBE_API_KEY_V3_2 or "").strip()
-    if secondary:
-        keys.append(secondary)
+    for raw in (
+        config.YOUTUBE_API_KEY_V3,
+        config.YOUTUBE_API_KEY_V3_2,
+        config.YOUTUBE_API_KEY_V3_3,
+        config.YOUTUBE_API_KEY_V3_4,
+    ):
+        key = (raw or "").strip()
+        if key:
+            keys.append(key)
     return keys
 
 
@@ -38,7 +42,7 @@ def youtube_key_labels_for_ui() -> list[str]:
         return []
     if n == 1:
         return ["Primary"]
-    return ["Primary", "Secondary"][:n]
+    return ["Primary", "Secondary", "Key 3", "Key 4"][:n]
 
 
 def configured_youtube_key_count() -> int:
