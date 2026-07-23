@@ -186,6 +186,21 @@ services:
     restart: always
     logging: *default-logging
 
+# Pin the default bridge to the GCP underlay MTU. GCP's network MTU is 1460,
+# but Docker (29.x) brings a bridge up at 1500 unless told otherwise. The
+# mismatch silently blackholes oversized OUTBOUND packets (PMTUD ICMP is
+# dropped), so large uploads — e.g. gpt-image's multipart image edit to
+# OpenAI — stall forever while small requests and downloads work fine. This
+# regressed on the 2026-07-13 reboot (bridge recreated at 1500) and broke
+# gptimage until an MSS clamp was applied on the host; this makes the fix
+# durable across reboots/recreates. Applying it requires recreating the
+# network (full `docker compose down && up`), not just a rolling deploy.
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "1460"
+
 volumes:
   postgres_data:
   mongo_data:
