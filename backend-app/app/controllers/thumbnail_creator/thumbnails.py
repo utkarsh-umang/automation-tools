@@ -100,8 +100,15 @@ async def list_thumbnails(
     cursor: uuid.UUID | None = Query(None),
     limit: int = Query(20, ge=1, le=100),
     folder_id: uuid.UUID | None = Query(None),
+    roots_only: bool = Query(False),
+    include_unfoldered: bool = Query(False),
 ) -> ThumbnailListResponse:
-    """ADMIN sees thumbnails from every member; MEMBER sees only their own."""
+    """ADMIN sees thumbnails from every member; MEMBER sees only their own.
+
+    ``roots_only`` returns one row per thumbnail lineage (its latest iteration)
+    instead of one per regeneration; ``include_unfoldered`` widens a folder query
+    to also include unfiled thumbnails (used for the Testing folder).
+    """
     return await thumbnail_service.list_thumbnail_jobs(
         db,
         uuid.UUID(current_user.id),
@@ -109,6 +116,8 @@ async def list_thumbnails(
         limit,
         is_admin=current_user.role == "ADMIN",
         folder_id=folder_id,
+        roots_only=roots_only,
+        include_unfoldered=include_unfoldered,
     )
 
 

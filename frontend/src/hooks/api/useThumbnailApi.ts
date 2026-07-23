@@ -42,13 +42,39 @@ export function isThumbnailJobAwaitingSelection(status: string): boolean {
 const LIST_POLL_MS = 3000
 const JOB_POLL_MS = 3000
 
-export function useThumbnailListInfiniteQuery(limit = 20) {
+export type ThumbnailListParams = {
+  /** Restrict to one folder (server-side). */
+  folderId?: string | null
+  /** Collapse iteration chains to one row per lineage (latest version). */
+  rootsOnly?: boolean
+  /** With `folderId`, also include unfiled thumbnails — used for Testing. */
+  includeUnfoldered?: boolean
+  /** Skip the query until true (e.g. no folder open yet). */
+  enabled?: boolean
+}
+
+export function useThumbnailListInfiniteQuery(
+  limit = 20,
+  params: ThumbnailListParams = {},
+) {
+  const {
+    folderId = null,
+    rootsOnly = false,
+    includeUnfoldered = false,
+    enabled = true,
+  } = params
   return useInfiniteQuery({
-    queryKey: thumbnailKeys.list(),
+    // Folder/mode are part of the key so each view caches independently; the
+    // shared `list()` prefix keeps create/select invalidations matching them all.
+    queryKey: [...thumbnailKeys.list(), { folderId, rootsOnly, includeUnfoldered, limit }],
+    enabled,
     queryFn: ({ pageParam }: { pageParam: string | null | undefined }) =>
       ThumbnailCreatorService.listThumbnailsApiV1ThumbnailsThumbnailGet(
         pageParam ?? undefined,
         limit,
+        folderId ?? undefined,
+        rootsOnly,
+        includeUnfoldered,
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,

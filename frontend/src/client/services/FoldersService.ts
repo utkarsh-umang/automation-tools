@@ -5,6 +5,7 @@
 import type { FolderCreate } from '../models/FolderCreate';
 import type { FolderListResponse } from '../models/FolderListResponse';
 import type { FolderPublic } from '../models/FolderPublic';
+import type { FolderSummaryResponse } from '../models/FolderSummaryResponse';
 import type { FolderUpdate } from '../models/FolderUpdate';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
@@ -19,6 +20,18 @@ export class FoldersService {
         return __request(OpenAPI, {
             method: 'GET',
             url: '/api/v1/folders',
+        });
+    }
+    /**
+     * Folder Summaries
+     * Per-folder thumbnail count + cover image for the album grid.
+     * @returns FolderSummaryResponse Successful Response
+     * @throws ApiError
+     */
+    public static folderSummariesApiV1FoldersSummaryGet(): CancelablePromise<FolderSummaryResponse> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/api/v1/folders/summary',
         });
     }
     /**

@@ -13,6 +13,8 @@ export type { Body_create_thumbnail_api_v1_thumbnails_thumbnail_post } from './m
 export type { FolderCreate } from './models/FolderCreate';
 export type { FolderListResponse } from './models/FolderListResponse';
 export type { FolderPublic } from './models/FolderPublic';
+export type { FolderSummary } from './models/FolderSummary';
+export type { FolderSummaryResponse } from './models/FolderSummaryResponse';
 export type { FolderUpdate } from './models/FolderUpdate';
 export type { HealthResponse } from './models/HealthResponse';
 export type { HTTPValidationError } from './models/HTTPValidationError';

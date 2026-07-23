@@ -40,6 +40,8 @@ export class ThumbnailCreatorService {
      * @param cursor
      * @param limit
      * @param folderId
+     * @param rootsOnly
+     * @param includeUnfoldered
      * @returns ThumbnailListResponse Successful Response
      * @throws ApiError
      */
@@ -47,6 +49,8 @@ export class ThumbnailCreatorService {
         cursor?: (string | null),
         limit: number = 20,
         folderId?: (string | null),
+        rootsOnly: boolean = false,
+        includeUnfoldered: boolean = false,
     ): CancelablePromise<ThumbnailListResponse> {
         return __request(OpenAPI, {
             method: 'GET',
@@ -55,6 +59,8 @@ export class ThumbnailCreatorService {
                 'cursor': cursor,
                 'limit': limit,
                 'folder_id': folderId,
+                'roots_only': rootsOnly,
+                'include_unfoldered': includeUnfoldered,
             },
             errors: {
                 422: `Validation Error`,

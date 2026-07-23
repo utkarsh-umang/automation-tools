@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants.s3_keys import thumbnail_input_base_key, thumbnail_input_reference_key
 from app.repositories import folder_repo, mongo_repo, pg_repo
+from app.schemas.folders import FolderSummary, FolderSummaryResponse
 from app.schemas.thumbnail_job_details import ThumbnailJobDetailsPayload
 from app.schemas.thumbnails import (
     ModelUsage,
@@ -203,11 +204,24 @@ async def list_thumbnail_jobs(
     *,
     is_admin: bool = False,
     folder_id: uuid.UUID | None = None,
+    roots_only: bool = False,
+    include_unfoldered: bool = False,
 ) -> ThumbnailListResponse:
-    """``is_admin`` lists thumbnail jobs across all members, not just ``user_id``."""
+    """``is_admin`` lists thumbnail jobs across all members, not just ``user_id``.
+
+    ``roots_only`` collapses each iteration chain to its latest version (one card
+    per thumbnail); ``include_unfoldered`` also pulls in unfiled thumbnails, used
+    for the Testing folder.
+    """
     filter_user_id = None if is_admin else user_id
     rows = await pg_repo.list_jobs_by_user(
-        session, filter_user_id, cursor, limit, folder_id=folder_id
+        session,
+        filter_user_id,
+        cursor,
+        limit,
+        folder_id=folder_id,
+        roots_only=roots_only,
+        include_unfoldered=include_unfoldered,
     )
     job_ids = [str(r["id"]) for r in rows]
     mongo_by_id = mongo_repo.get_details_many(job_ids)
@@ -224,6 +238,31 @@ async def list_thumbnail_jobs(
     if rows and len(rows) == limit:
         next_cursor = _as_uuid(rows[-1]["id"])
     return ThumbnailListResponse(jobs=jobs, next_cursor=next_cursor)
+
+
+async def get_folder_summaries(
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    is_admin: bool = False,
+) -> FolderSummaryResponse:
+    """Lineage count + cover image per folder for the album grid.
+
+    Respects the same visibility rule as the list: ADMIN sees every member's
+    thumbnails, MEMBER only their own.
+    """
+    filter_user_id = None if is_admin else user_id
+    rows = await pg_repo.folder_lineage_summaries(session, filter_user_id)
+    return FolderSummaryResponse(
+        summaries=[
+            FolderSummary(
+                folder_id=r["folder_id"],
+                count=r["count"],
+                cover_url=r["cover_url"],
+            )
+            for r in rows
+        ]
+    )
 
 
 async def _creator_emails(

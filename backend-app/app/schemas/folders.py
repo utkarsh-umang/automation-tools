@@ -29,3 +29,19 @@ class FolderPublic(BaseModel):
 
 class FolderListResponse(BaseModel):
     folders: list[FolderPublic]
+
+
+class FolderSummary(BaseModel):
+    """A folder album tile: how many thumbnails it holds and a cover image.
+
+    ``folder_id`` is ``None`` for the unfoldered bucket (thumbnails created
+    without a folder), which the UI folds into the "Testing" tile.
+    """
+
+    folder_id: uuid.UUID | None
+    count: int
+    cover_url: str | None = None
+
+
+class FolderSummaryResponse(BaseModel):
+    summaries: list[FolderSummary]

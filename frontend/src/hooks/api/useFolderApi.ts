@@ -4,12 +4,21 @@ import { FoldersService, type FolderCreate, type FolderUpdate } from '@/client'
 export const folderKeys = {
   all: ['folders'] as const,
   list: () => [...folderKeys.all, 'list'] as const,
+  summary: () => [...folderKeys.all, 'summary'] as const,
 }
 
 export function useFolderListQuery() {
   return useQuery({
     queryKey: folderKeys.list(),
     queryFn: () => FoldersService.listFoldersApiV1FoldersGet(),
+  })
+}
+
+/** Per-folder thumbnail count + cover image, for the album grid. */
+export function useFolderSummaryQuery() {
+  return useQuery({
+    queryKey: folderKeys.summary(),
+    queryFn: () => FoldersService.folderSummariesApiV1FoldersSummaryGet(),
   })
 }
 

@@ -12,8 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, get_current_user
 from app.db.session import get_db_session
-from app.schemas.folders import FolderCreate, FolderListResponse, FolderPublic, FolderUpdate
-from app.services import folder_service
+from app.schemas.folders import (
+    FolderCreate,
+    FolderListResponse,
+    FolderPublic,
+    FolderSummaryResponse,
+    FolderUpdate,
+)
+from app.services import folder_service, thumbnail_service
 
 router = APIRouter()
 
@@ -35,6 +41,21 @@ async def list_folders(
     db: AsyncSession = Depends(get_db_session),
 ) -> FolderListResponse:
     return await folder_service.list_folders(db)
+
+
+@router.get("/summary", response_model=FolderSummaryResponse)
+async def folder_summaries(
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> FolderSummaryResponse:
+    """Per-folder thumbnail count + cover image for the album grid.
+
+    ADMIN counts every member's thumbnails; MEMBER only their own. The
+    unfoldered bucket comes back with ``folder_id = null``.
+    """
+    return await thumbnail_service.get_folder_summaries(
+        db, uuid.UUID(current_user.id), is_admin=current_user.role == "ADMIN"
+    )
 
 
 @router.patch("/{folder_id}", response_model=FolderPublic)
