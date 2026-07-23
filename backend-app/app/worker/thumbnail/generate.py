@@ -64,13 +64,13 @@ def _run_async_pg(coro):
     engine pool across loops triggers "another operation is in progress".
     """
 
-    async def _runner() -> None:
+    async def _runner():
         try:
-            await coro
+            return await coro
         finally:
             await engine.dispose(close=True)
 
-    asyncio.run(_runner())
+    return asyncio.run(_runner())
 
 
 async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
@@ -237,3 +237,47 @@ def generate_thumbnail_task(self, job_id: str) -> None:
                 details.get("model"),
             )
             return
+
+
+_STALE_PROCESSING_MINUTES = 10
+_STALE_TIMEOUT_MESSAGE = "Task timed out and was not cleaned up (worker killed)"
+
+
+async def _reap_stale_processing_jobs() -> int:
+    """Backstop for jobs orphaned by a hard-time-limit SIGKILL (SBL-17).
+
+    The soft time limit's ``SoftTimeLimitExceeded`` handler above is
+    cooperative — it only fires if the task is at a point in its execution
+    where Python can receive the signal. If a task is blocked deep in a
+    provider HTTP call in a way that doesn't yield back to Python promptly,
+    the hard limit's SIGKILL is what actually stops it, and SIGKILL bypasses
+    every Python ``except``/``finally``, leaving the job stuck in
+    ``processing`` forever with no error recorded. 10 minutes is generous
+    headroom above the worst case (3 attempts x (170s hard limit + 10s retry
+    countdown) ~= 9 minutes) so this never races a job that's still
+    legitimately retrying.
+    """
+    reaped = 0
+    async with AsyncSessionLocal() as session:
+        stale = await pg_repo.list_stale_processing(session, _STALE_PROCESSING_MINUTES)
+        for job in stale:
+            await pg_repo.update_failed(session, job["id"], _STALE_TIMEOUT_MESSAGE)
+            logger.error(
+                "thumbnail.generate event=reaped_stale_processing job_id=%s "
+                "stuck_since=%s",
+                job["id"],
+                job["updated_at"],
+            )
+            reaped += 1
+        await session.commit()
+    return reaped
+
+
+@celery_app.task(name="thumbnail.reap_stale_processing_jobs")
+def reap_stale_processing_jobs_task() -> None:
+    """Celery beat task: sweep for jobs orphaned by a hard-time-limit kill."""
+    reaped = _run_async_pg(_reap_stale_processing_jobs())
+    if reaped:
+        logger.warning(
+            "thumbnail.generate event=watchdog_reaped count=%d", reaped
+        )

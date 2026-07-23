@@ -7,6 +7,7 @@ all SQL for thumbnail jobs (no raw SQL elsewhere in the app for this table).
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import and_, func, or_, select, update
@@ -107,6 +108,25 @@ async def update_failed(
         .where(ThumbnailJob.id == job_id)
         .values(error=error, status="failed", updated_at=func.now())
     )
+
+
+async def list_stale_processing(
+    session: AsyncSession, older_than_minutes: int
+) -> list[dict[str, Any]]:
+    """Jobs stuck in ``processing`` longer than a hard-time-limit worker kill
+
+    could ever leave one, un-reaped. Backstop for the watchdog: a hard
+    time-limit kill (SIGKILL) bypasses all Python cleanup, so a job can be
+    orphaned in ``processing`` forever with no failure recorded.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=older_than_minutes)
+    stmt = select(ThumbnailJob).where(
+        ThumbnailJob.status == "processing",
+        ThumbnailJob.updated_at < cutoff,
+    )
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [_job_to_dict(r) for r in rows]
 
 
 async def list_jobs_by_user(

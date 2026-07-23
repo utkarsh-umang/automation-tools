@@ -335,3 +335,69 @@ def test_retry_reraising_original_exception_still_marks_failed() -> None:
                     jid, "Unsupported thumbnail model: 'fluxkontext'"
                 )
                 cap.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_reap_stale_processing_jobs_marks_each_failed() -> None:
+    """Regression: a hard-time-limit SIGKILL bypasses SoftTimeLimitExceeded's
+    cooperative handler, orphaning jobs in ``processing`` forever with no
+    error recorded (seen in production — three jobs stuck for hours/days).
+    The watchdog must find every such job and mark it failed.
+    """
+    sess_cm, session = _session_context_mocks()
+    stale = [
+        {"id": uuid.uuid4(), "updated_at": "2026-07-18T15:56:58Z"},
+        {"id": uuid.uuid4(), "updated_at": "2026-07-18T16:07:25Z"},
+    ]
+    with patch("app.worker.thumbnail.generate.AsyncSessionLocal", return_value=sess_cm):
+        with patch.object(
+            gen_mod.pg_repo,
+            "list_stale_processing",
+            new_callable=AsyncMock,
+            return_value=stale,
+        ) as lsp:
+            with patch.object(
+                gen_mod.pg_repo, "update_failed", new_callable=AsyncMock
+            ) as uf:
+                reaped = await gen_mod._reap_stale_processing_jobs()
+
+    lsp.assert_awaited_once_with(session, gen_mod._STALE_PROCESSING_MINUTES)
+    assert uf.await_count == 2
+    for job in stale:
+        uf.assert_any_await(session, job["id"], gen_mod._STALE_TIMEOUT_MESSAGE)
+    assert reaped == 2
+    session.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_reap_stale_processing_jobs_noop_when_none_stale() -> None:
+    sess_cm, session = _session_context_mocks()
+    with patch("app.worker.thumbnail.generate.AsyncSessionLocal", return_value=sess_cm):
+        with patch.object(
+            gen_mod.pg_repo,
+            "list_stale_processing",
+            new_callable=AsyncMock,
+            return_value=[],
+        ):
+            with patch.object(
+                gen_mod.pg_repo, "update_failed", new_callable=AsyncMock
+            ) as uf:
+                reaped = await gen_mod._reap_stale_processing_jobs()
+
+    uf.assert_not_awaited()
+    assert reaped == 0
+    session.commit.assert_awaited_once()
+
+
+def test_reap_stale_processing_jobs_task_runs_through_asyncio() -> None:
+    """The Celery beat task wrapper must actually drive the coroutine (via
+    _run_async_pg/asyncio.run) and propagate its return value — a prior bug
+    in _run_async_pg discarded the coroutine's result entirely."""
+    with patch.object(
+        gen_mod, "_reap_stale_processing_jobs", new_callable=AsyncMock
+    ) as reap:
+        reap.return_value = 3
+        with patch("app.worker.thumbnail.generate.asyncio.run") as run:
+            run.return_value = 3
+            gen_mod.reap_stale_processing_jobs_task.run()
+    run.assert_called_once()

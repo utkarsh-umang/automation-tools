@@ -39,5 +39,14 @@ celery_app.conf.update(
             "task": "youtube.auto_trigger_worker",
             "schedule": crontab(minute=0, hour="1-23"),
         },
+        # Reap thumbnail jobs orphaned by a hard-time-limit SIGKILL (the soft
+        # limit's cooperative cleanup can't always run — see generate.py).
+        # Every 5 minutes is frequent enough that a stuck job never sits
+        # unexplained for long, cheap enough (one indexed query, usually
+        # zero rows) to not matter at this interval.
+        "reap-stale-thumbnail-jobs": {
+            "task": "thumbnail.reap_stale_processing_jobs",
+            "schedule": crontab(minute="*/5"),
+        },
     },
 )

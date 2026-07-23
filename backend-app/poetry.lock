@@ -29,7 +29,7 @@ python-dotenv = "*"
 type = "git"
 url = "https://github.com/utkarsh-umang/ai-agents-service.git"
 reference = "thumbnail-stable"
-resolved_reference = "5de2314d2a33b5b720fc713068b98c187d5f8d99"
+resolved_reference = "86adea253de497c79f801798f2d4f4c32fe66e59"
 
 [[package]]
 name = "aiofiles"
