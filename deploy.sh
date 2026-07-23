@@ -20,6 +20,19 @@ RESET="\033[0m"
 log() { echo -e "${CYAN}▶ $1${RESET}"; }
 success() { echo -e "${GREEN}✓ $1${RESET}"; }
 
+# Every deploy retags `:latest` to a new image, leaving the previous one
+# dangling (untagged, 0 containers) — Docker never garbage-collects these on
+# its own. Left unchecked this silently ate ~19GB of a 49GB disk over a few
+# months of deploys. Rollback isn't affected: the immutable ${TAG} image
+# stays in the remote registry either way, this only prunes the VM's local,
+# now-unreferenced copies.
+prune_old_images() {
+    log "Pruning dangling images on VM..."
+    gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
+        "docker image prune -f"
+    success "Old images pruned"
+}
+
 # Copy the latest compose + nginx config to the VM so they stay in sync
 sync_compose() {
     log "Syncing $COMPOSE_FILE and nginx.conf to VM..."
@@ -47,6 +60,8 @@ deploy_backend() {
     gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
         "cd ${VM_DIR} && docker compose -f ${COMPOSE_FILE} pull backend celery-worker celery-beat && docker compose -f ${COMPOSE_FILE} up -d backend celery-worker celery-beat"
 
+    prune_old_images
+
     success "Backend deployed"
 }
 
@@ -62,6 +77,8 @@ deploy_frontend() {
     log "Restarting frontend on VM..."
     gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
         "cd ${VM_DIR} && docker compose -f ${COMPOSE_FILE} pull frontend && docker compose -f ${COMPOSE_FILE} up -d frontend"
+
+    prune_old_images
 
     success "Frontend deployed"
 }

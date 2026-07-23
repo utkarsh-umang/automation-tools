@@ -4,6 +4,19 @@
 #   2. Place your GCP service-account JSON at repo root as: credentials.json
 #   3. docker compose -f docker-compose.prod.yml up -d --build
 
+# Bounded log retention for every service: 5 x 10MB = 50MB ceiling per
+# container. Docker's default json-file driver has NO size limit unless
+# told one — a single chatty service (a healthcheck firing every 5s, 24/7)
+# can otherwise grow unbounded and fill the disk (mongo's did: 23GB from
+# routine connection-lifecycle logging alone). `local` is Docker's own
+# successor to json-file for this case — same `docker logs` compatibility,
+# more compact storage, automatic compression on rotation.
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   # ── Databases ──────────────────────────────────────────────────────────────
 
@@ -21,6 +34,7 @@ services:
       timeout: 5s
       retries: 10
     restart: always
+    logging: *default-logging
 
   mongo:
     image: mongo:7
@@ -32,6 +46,7 @@ services:
       timeout: 5s
       retries: 10
     restart: always
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -46,6 +61,7 @@ services:
       timeout: 5s
       retries: 10
     restart: always
+    logging: *default-logging
 
   # ── Backend ────────────────────────────────────────────────────────────────
 
@@ -71,6 +87,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    logging: *default-logging
 
   # ── Celery worker ──────────────────────────────────────────────────────────
 
@@ -96,6 +113,7 @@ services:
         condition: service_healthy
       backend:
         condition: service_started
+    logging: *default-logging
 
   # ── Celery beat (cron scheduler for auto batch triggering) ──────────────────
 
@@ -120,6 +138,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    logging: *default-logging
 
   # ── Flower (Celery monitoring UI) ──────────────────────────────────────────
 
@@ -138,6 +157,7 @@ services:
         condition: service_healthy
       celery-worker:
         condition: service_started
+    logging: *default-logging
 
   # ── Frontend (nginx serves React SPA + proxies /api to backend) ────────────
 
@@ -153,6 +173,7 @@ services:
     restart: always
     depends_on:
       - backend
+    logging: *default-logging
 
   # ── Certbot (Let's Encrypt certificate management) ───────────────────────
 
@@ -163,6 +184,7 @@ services:
       - certbot_certs:/etc/letsencrypt
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done'"
     restart: always
+    logging: *default-logging
 
 volumes:
   postgres_data:
