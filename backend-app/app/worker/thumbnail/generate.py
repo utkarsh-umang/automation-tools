@@ -7,9 +7,10 @@ The caller picks one via ``thumbnail_service.select_thumbnail_candidate``, which
 moves the job to ``completed``. Idempotent if already ``completed`` with
 ``result_url``, or already ``awaiting_selection`` with candidates set (SBL-13).
 
-Retries (SBL-14): ``max_retries=2``, ``countdown=10``; final failure stores up to
-500 chars in PG ``error``. Time limits (SBL-16): soft 150s / hard 170s; soft
-timeout marks PG failed with a fixed message.
+Retries (SBL-14): ``max_retries=1``, ``countdown=10``; final failure stores up to
+500 chars in PG ``error``. Time limits (SBL-16): soft 300s / hard 360s (image
+renders legitimately take ~90-100s each); soft timeout marks PG failed with a
+fixed message.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from ai_agents import run_thumbnail_agent
 logger = logging.getLogger(__name__)
 
 _MAX_PG_ERROR_LEN = 500
-_TIMEOUT_USER_MESSAGE = "Task timed out after 150s"
+_TIMEOUT_USER_MESSAGE = "Task timed out after 300s"
 _NUM_CANDIDATES = 2
 
 
@@ -191,12 +192,16 @@ async def _async_generate_thumbnail(job_id: str, t0: float) -> None:
 @celery_app.task(
     bind=True,
     name="thumbnail.generate_thumbnail",
-    max_retries=2,
-    # Generating 2 candidates concurrently should stay close to single-candidate
-    # wall-clock, but with headroom for network contention between the two
-    # in-flight generation calls plus two S3 uploads instead of one.
-    soft_time_limit=150,
-    time_limit=170,
+    max_retries=1,
+    # gpt-image-2 / Gemini renders legitimately take ~90-100s each; two
+    # candidates generate concurrently, so wall-clock is ~one render plus
+    # contention. The image-model clients themselves time out at 180s (see
+    # ai_agents), so the soft limit must sit above that with room for the
+    # surrounding S3 downloads/uploads — 300s soft / 360s hard. (The old
+    # 150s/170s were tuned when an MTU upload stall made every gptimage call
+    # hang; now that that's fixed, they were cutting real renders off.)
+    soft_time_limit=300,
+    time_limit=360,
 )
 def generate_thumbnail_task(self, job_id: str) -> None:
     """Background thumbnail generation; sole argument ``job_id`` (UUID string)."""
@@ -239,7 +244,7 @@ def generate_thumbnail_task(self, job_id: str) -> None:
             return
 
 
-_STALE_PROCESSING_MINUTES = 10
+_STALE_PROCESSING_MINUTES = 15
 _STALE_TIMEOUT_MESSAGE = "Task timed out and was not cleaned up (worker killed)"
 
 
@@ -252,9 +257,9 @@ async def _reap_stale_processing_jobs() -> int:
     provider HTTP call in a way that doesn't yield back to Python promptly,
     the hard limit's SIGKILL is what actually stops it, and SIGKILL bypasses
     every Python ``except``/``finally``, leaving the job stuck in
-    ``processing`` forever with no error recorded. 10 minutes is generous
-    headroom above the worst case (3 attempts x (170s hard limit + 10s retry
-    countdown) ~= 9 minutes) so this never races a job that's still
+    ``processing`` forever with no error recorded. 15 minutes is generous
+    headroom above the worst case (2 attempts x (360s hard limit + 10s retry
+    countdown) ~= 12.3 minutes) so this never races a job that's still
     legitimately retrying.
     """
     reaped = 0
