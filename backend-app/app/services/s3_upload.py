@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import quote
 
 import boto3
@@ -30,6 +31,10 @@ def _guess_content_type(key: str) -> str:
         return "image/jpeg"
     if lower.endswith(".webp"):
         return "image/webp"
+    if lower.endswith(".mp4"):
+        return "video/mp4"
+    if lower.endswith(".webm"):
+        return "video/webm"
     return "application/octet-stream"
 
 
@@ -89,6 +94,40 @@ def upload_to_s3(data: bytes, key: str) -> str:
     except (ClientError, BotoCoreError) as exc:
         raise S3UploadError(
             f"S3 put_object failed for key {key!r} in bucket "
+            f"{config.THUMBNAIL_S3_BUCKET!r}: {exc}"
+        ) from exc
+
+    return _object_read_url(client, key)
+
+
+def upload_file_to_s3(file_path: str | Path, key: str) -> str:
+    """Upload a file from disk to S3. Returns an accessible URL.
+
+    The file-based sibling of :func:`upload_to_s3`. Short-video clips are tens of
+    megabytes, so they are streamed with ``upload_file`` rather than read into
+    memory as bytes; everything else — client construction, bucket config,
+    direct-vs-presigned URL choice — is shared with the bytes path so the two
+    cannot drift.
+    """
+    if not config.THUMBNAIL_S3_BUCKET:
+        raise S3UploadError(
+            "S3 bucket is not configured (set THUMBNAIL_S3_BUCKET in the environment)"
+        )
+    source = Path(file_path)
+    if not source.is_file():
+        raise S3UploadError(f"file not found for upload: {source}")
+
+    client = _s3_client()
+    try:
+        client.upload_file(
+            Filename=str(source),
+            Bucket=config.THUMBNAIL_S3_BUCKET,
+            Key=key,
+            ExtraArgs={"ContentType": _guess_content_type(key)},
+        )
+    except (ClientError, BotoCoreError) as exc:
+        raise S3UploadError(
+            f"S3 upload_file failed for key {key!r} in bucket "
             f"{config.THUMBNAIL_S3_BUCKET!r}: {exc}"
         ) from exc
 

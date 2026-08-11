@@ -36,6 +36,14 @@ pandas = "^2.0"
 # `thumbnail` is deliberately an empty extra — ai_agents/__init__.py eagerly imports
 # the thumbnail agent, so its deps are core. Naming it keeps the intent explicit.
 ai-agents-service = { git = "https://github.com/utkarsh-umang/ai-agents-service.git", branch = "develop", extras = ["thumbnail"] }
+# Short Video tool: downloads the source video.
+# NOT YET RUNNABLE IN THE IMAGE. Before the first job can run, Dockerfile.celery
+# needs the ffmpeg binary (to cut clips and to mux yt-dlp's separate streams) and
+# a JS runtime — yt-dlp deprecates extraction without one and silently loses
+# formats. Deliberately not added yet: nothing invokes this code, and shipping
+# both would grow the production image for no working feature. Until then
+# resolve_ffmpeg() raises a clear FFmpegNotFound rather than failing obscurely.
+yt-dlp = "^2026.7.4"
 boto3 = "^1.42.0"
 sentry-sdk = {version = "^2.19.0", optional = true}
 sqlalchemy = ">=2.0"
