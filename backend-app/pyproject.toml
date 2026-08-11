@@ -29,7 +29,13 @@ requests = "^2.32.5"
 google-api-python-client = "^2.0"
 google-auth = "^2.0"
 pandas = "^2.0"
-ai-agents-service = { git = "https://github.com/utkarsh-umang/ai-agents-service.git", branch = "thumbnail-stable" }
+# Tracks `develop` and asks for the `thumbnail` extra only, so this backend never
+# installs the email-finder stack (crawl4ai/playwright, litellm, langgraph).
+# Was pinned to the `thumbnail-stable` branch, which isolated dependencies via git
+# history because the package had one flat dependency list; extras replaced that.
+# `thumbnail` is deliberately an empty extra — ai_agents/__init__.py eagerly imports
+# the thumbnail agent, so its deps are core. Naming it keeps the intent explicit.
+ai-agents-service = { git = "https://github.com/utkarsh-umang/ai-agents-service.git", branch = "develop", extras = ["thumbnail"] }
 boto3 = "^1.42.0"
 sentry-sdk = {version = "^2.19.0", optional = true}
 sqlalchemy = ">=2.0"
