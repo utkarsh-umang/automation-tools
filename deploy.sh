@@ -43,6 +43,27 @@ sync_compose() {
     success "Compose file and nginx.conf synced"
 }
 
+# A backend deploy recreates the backend container — often on a new Docker IP —
+# but leaves the frontend running, and nginx caches the address it resolved when
+# its workers started. The result is a total API outage that looks like a
+# healthy deploy: every container is "Up", the backend answers fine over
+# `docker exec`, and only traffic through the front door 502s. That cost ~37
+# minutes on 2026-08-19.
+#
+# nginx.conf now re-resolves at request time, so this is belt-and-braces — but
+# `sync_compose` copies a fresh nginx.conf up on every deploy and nothing was
+# ever telling nginx to read it, so the reload earns its place regardless.
+#
+# `nginx -t` first: a reload with a broken config is refused and nginx keeps
+# serving the old one, so validating up front turns a silent no-op into a loud
+# deploy failure.
+reload_nginx() {
+    log "Reloading nginx (re-resolve backend + pick up synced nginx.conf)..."
+    gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
+        "docker exec automation-tools-frontend-1 nginx -t && docker exec automation-tools-frontend-1 nginx -s reload"
+    success "nginx reloaded"
+}
+
 deploy_backend() {
     log "Building backend image (tag: latest + ${TAG})..."
     docker build --platform linux/amd64 -t "$REGISTRY/backend:latest" -t "$REGISTRY/backend:${TAG}" ./backend-app -f ./backend-app/Dockerfile
@@ -59,6 +80,8 @@ deploy_backend() {
     log "Restarting backend + celery-worker + celery-beat on VM..."
     gcloud compute ssh "${VM_USER}@tools-automation" --zone=us-central1-c --project=enlead-ai -- \
         "cd ${VM_DIR} && docker compose -f ${COMPOSE_FILE} pull backend celery-worker celery-beat && docker compose -f ${COMPOSE_FILE} up -d backend celery-worker celery-beat"
+
+    reload_nginx
 
     prune_old_images
 
