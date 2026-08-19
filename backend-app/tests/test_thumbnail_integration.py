@@ -7,6 +7,7 @@ the test event loop with SQLAlchemy/asyncpg; the Celery wrapper only adds
 
 from __future__ import annotations
 
+import base64
 import time
 import uuid
 from typing import Any
@@ -45,7 +46,12 @@ pytestmark = [
 ]
 
 
-_PNG = b"\x89PNG\r\n\x1a\n"
+# A real (decodable) 1x1 PNG. The inputs are decoded at the edge now, so an
+# 8-byte signature is no longer a stand-in for an image.
+_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmM"
+    "IQAAAABJRU5ErkJggg=="
+)
 
 
 def _create_thumb_multipart() -> dict[str, Any]:

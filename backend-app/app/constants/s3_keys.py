@@ -32,43 +32,41 @@ THUMBNAIL_INPUTS_PREFIX = "thumbnail-inputs"
 SHORT_VIDEO_PREFIX = "short-video"
 SHORT_VIDEO_INPUTS_PREFIX = "short-video-inputs"
 
-_CONTENT_TYPE_TO_EXT: dict[str, str] = {
-    "image/png": ".png",
-    "image/jpeg": ".jpg",
-    "image/jpg": ".jpg",
-    "image/webp": ".webp",
-    "image/gif": ".gif",
+# The single source of truth for extension → Content-Type. ``s3_upload`` stamps
+# an object's Content-Type from the key built here, and the image providers read
+# that header instead of sniffing the body, so an extension missing from this
+# table degrades silently to ``application/octet-stream`` and the provider
+# rejects the job. Every extension these builders can emit must have an entry.
+#
+# It lives on the key side, not the upload side, precisely because the two used
+# to be separate lists that drifted: keys could be named ``.gif`` while the
+# uploader knew nothing about ``.gif``, so a GIF was stored unreadable.
+EXT_TO_CONTENT_TYPE: dict[str, str] = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".webp": "image/webp",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
 }
 
 
-def input_image_extension(filename: str | None, content_type: str | None) -> str:
-    """Pick ``.png`` / ``.jpg`` / … from filename suffix, else ``Content-Type``, else ``.bin``."""
-    if filename:
-        ext = Path(filename).suffix.lower()
-        if ext == ".jpeg":
-            ext = ".jpg"
-        if ext in {".png", ".jpg", ".webp", ".gif"}:
-            return ext
-    ct = (content_type or "").split(";")[0].strip().lower()
-    return _CONTENT_TYPE_TO_EXT.get(ct, ".bin")
+def content_type_for_key(key: str) -> str:
+    """Content-Type to store ``key`` under, or ``application/octet-stream`` if unknown."""
+    return EXT_TO_CONTENT_TYPE.get(Path(key).suffix.lower(), "application/octet-stream")
 
 
-def thumbnail_input_reference_key(
-    job_id: str,
-    filename: str | None,
-    content_type: str | None,
-) -> str:
-    ext = input_image_extension(filename, content_type)
+def thumbnail_input_reference_key(job_id: str, ext: str) -> str:
+    """``ext`` must come from :func:`app.services.image_normalise.normalise_input_image`.
+
+    It names the format of the bytes as decoded, not as the browser labelled
+    them, and it must be a key of :data:`EXT_TO_CONTENT_TYPE`.
+    """
     return f"{THUMBNAIL_INPUTS_PREFIX}/{job_id}/reference{ext}"
 
 
-def thumbnail_input_base_key(
-    job_id: str,
-    index: int,
-    filename: str | None,
-    content_type: str | None,
-) -> str:
-    ext = input_image_extension(filename, content_type)
+def thumbnail_input_base_key(job_id: str, index: int, ext: str) -> str:
+    """See :func:`thumbnail_input_reference_key` for where ``ext`` comes from."""
     return f"{THUMBNAIL_INPUTS_PREFIX}/{job_id}/base/{index}{ext}"
 
 

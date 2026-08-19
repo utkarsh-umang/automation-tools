@@ -23,6 +23,11 @@ from app.schemas.thumbnails import (
     ThumbnailUsageResponse,
 )
 from app.services import user_service
+from app.services.image_normalise import (
+    NormalisedImage,
+    UnsupportedImageError,
+    normalise_input_image,
+)
 from app.services.s3_upload import S3UploadError, upload_to_s3
 from app.services.thumbnail_access import require_thumbnail_job_owner
 
@@ -35,6 +40,22 @@ MONTHLY_MODEL_CAP = 50
 
 def _as_uuid(v: Any) -> uuid.UUID:
     return v if isinstance(v, uuid.UUID) else uuid.UUID(str(v))
+
+
+def _normalised(
+    upload: tuple[bytes, str | None, str | None],
+    *,
+    field_label: str,
+) -> NormalisedImage:
+    """Decode one upload, or turn the failure into a 400 naming the field."""
+    data, filename, content_type = upload
+    try:
+        return normalise_input_image(data, filename, content_type)
+    except UnsupportedImageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_label}: {exc}",
+        ) from exc
 
 
 def _start_of_current_month() -> datetime:
@@ -146,9 +167,16 @@ async def create_thumbnail_job(
                 else f"CLIENT STYLE (always apply): {style_prompt}"
             )
 
+    # Decode every upload before the job row exists: an unreadable image is the
+    # user's mistake to fix in the next few seconds, not a failed job to explain
+    # in the history list.
+    ref_image = _normalised(reference, field_label="reference_image")
+    base_normalised = [
+        _normalised(b, field_label=f"base_images[{i}]") for i, b in enumerate(base_images)
+    ]
+
     job_id = uuid.uuid4()
     jid_str = str(job_id)
-    ref_bytes, ref_fn, ref_ct = reference
 
     await pg_repo.create_job(
         session,
@@ -160,14 +188,14 @@ async def create_thumbnail_job(
         folder_id=folder_id,
     )
 
-    ref_key = thumbnail_input_reference_key(jid_str, ref_fn, ref_ct)
+    ref_key = thumbnail_input_reference_key(jid_str, ref_image.ext)
     try:
-        ref_url = upload_to_s3(ref_bytes, ref_key)
+        ref_url = upload_to_s3(ref_image.data, ref_key)
         base_urls: list[str] = []
         base_keys: list[str] = []
-        for i, (bdata, bfn, bct) in enumerate(base_images):
-            bk = thumbnail_input_base_key(jid_str, i, bfn, bct)
-            base_urls.append(upload_to_s3(bdata, bk))
+        for i, base_image in enumerate(base_normalised):
+            bk = thumbnail_input_base_key(jid_str, i, base_image.ext)
+            base_urls.append(upload_to_s3(base_image.data, bk))
             base_keys.append(bk)
     except S3UploadError as exc:
         raise HTTPException(

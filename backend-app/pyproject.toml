@@ -45,6 +45,12 @@ ai-agents-service = { git = "https://github.com/utkarsh-umang/ai-agents-service.
 # resolve_ffmpeg() raises a clear FFmpegNotFound rather than failing obscurely.
 yt-dlp = "^2026.7.4"
 boto3 = "^1.42.0"
+# Decodes user-uploaded references/base images so we can transcode whatever the
+# browser's `image/*` picker let through (AVIF, HEIC-ish, animated GIF) into the
+# JPEG/PNG/WebP the image providers accept. >=11.3 is the floor because that is
+# where AVIF decoding became native — the manylinux wheels bundle libavif, so no
+# system packages are needed in the image.
+pillow = ">=11.3"
 sentry-sdk = {version = "^2.19.0", optional = true}
 sqlalchemy = ">=2.0"
 

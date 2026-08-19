@@ -149,26 +149,48 @@ def test_thumbnail_s3_key_constant() -> None:
     assert thumbnail_s3_key(jid) == f"thumbnails/{jid}.png"
 
 
-def test_thumbnail_input_keys_and_extension() -> None:
+def test_thumbnail_input_keys() -> None:
     from app.constants.s3_keys import (
         THUMBNAIL_INPUTS_PREFIX,
-        input_image_extension,
         thumbnail_input_base_key,
         thumbnail_input_reference_key,
     )
 
     jid = "550e8400-e29b-41d4-a716-446655440000"
     assert THUMBNAIL_INPUTS_PREFIX == "thumbnail-inputs"
-    assert input_image_extension("x.PNG", None) == ".png"
-    assert input_image_extension("x.jpeg", None) == ".jpg"
-    assert input_image_extension(None, "image/webp") == ".webp"
-    assert input_image_extension(None, None) == ".bin"
-    assert thumbnail_input_reference_key(jid, "ref.jpg", None) == (
+    assert thumbnail_input_reference_key(jid, ".jpg") == (
         f"{THUMBNAIL_INPUTS_PREFIX}/{jid}/reference.jpg"
     )
-    assert thumbnail_input_base_key(jid, 0, None, "image/png") == (
+    assert thumbnail_input_base_key(jid, 0, ".png") == (
         f"{THUMBNAIL_INPUTS_PREFIX}/{jid}/base/0.png"
     )
+
+
+def test_every_producible_extension_has_a_content_type() -> None:
+    """The regression guard for the ``.gif`` desync.
+
+    Key building and Content-Type stamping used to be two hand-maintained lists.
+    They drifted, and an extension the key side could emit but the upload side
+    did not know became ``application/octet-stream`` — silently unreadable to the
+    image providers. Anything ``normalise_input_image`` can hand back must
+    resolve to a real media type.
+    """
+    from app.constants.s3_keys import (
+        EXT_TO_CONTENT_TYPE,
+        content_type_for_key,
+        thumbnail_input_reference_key,
+    )
+    from app.services.image_normalise import _PASSTHROUGH_EXT
+
+    producible = set(_PASSTHROUGH_EXT.values()) | {".png", ".jpg"}
+    assert producible <= set(EXT_TO_CONTENT_TYPE)
+
+    jid = "550e8400-e29b-41d4-a716-446655440000"
+    for ext in producible:
+        key = thumbnail_input_reference_key(jid, ext)
+        assert content_type_for_key(key).startswith("image/"), ext
+
+    assert content_type_for_key("x/y.bin") == "application/octet-stream"
 
 
 @patch("app.services.thumbnail_s3.upload_to_s3")

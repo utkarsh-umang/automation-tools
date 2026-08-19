@@ -9,6 +9,7 @@ import boto3
 from botocore.client import BaseClient
 from botocore.exceptions import BotoCoreError, ClientError
 
+from app.constants.s3_keys import content_type_for_key
 from app.core.config import config
 
 
@@ -24,18 +25,7 @@ def _s3_client() -> BaseClient:
 
 
 def _guess_content_type(key: str) -> str:
-    lower = key.lower()
-    if lower.endswith(".png"):
-        return "image/png"
-    if lower.endswith(".jpg") or lower.endswith(".jpeg"):
-        return "image/jpeg"
-    if lower.endswith(".webp"):
-        return "image/webp"
-    if lower.endswith(".mp4"):
-        return "video/mp4"
-    if lower.endswith(".webm"):
-        return "video/webm"
-    return "application/octet-stream"
+    return content_type_for_key(key)
 
 
 def _direct_url(key: str) -> str:

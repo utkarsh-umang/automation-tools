@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -13,7 +14,12 @@ pytestmark = pytest.mark.anyio
 # Must match ``thumbnail_creator_router`` mount: /api/v1/thumbnails + /thumbnail
 _THUMB_BASE = "/api/v1/thumbnails/thumbnail"
 
-_PNG = b"\x89PNG\r\n\x1a\n"
+# A real (decodable) 1x1 PNG. The inputs are decoded at the edge now, so an
+# 8-byte signature is no longer a stand-in for an image.
+_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mP8z8BQDwAEhQGAhKmM"
+    "IQAAAABJRU5ErkJggg=="
+)
 
 _THUMB_CREATE_KWARGS: dict[str, Any] = {
     "files": [
