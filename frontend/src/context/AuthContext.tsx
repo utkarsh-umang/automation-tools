@@ -2,6 +2,7 @@ import { createContext, useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { OpenAPI, UsersService } from '@/client'
 import type { AuthUser } from '@/types/auth'
+import { onSessionExpired } from '@/utils/sessionExpiry'
 import { getToken, isTokenExpired, removeToken, setToken } from '@/utils/token'
 
 interface AuthContextValue {
@@ -84,6 +85,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setTokenState(null)
     setUser(null)
   }, [])
+
+  // The mount check above only catches a token that was already dead when the
+  // app loaded. A tab left open past the 24h expiry keeps a live `token` in
+  // state, so `ProtectedRoute` goes on rendering while every request 401s.
+  // Dropping the session here flips `isAuthenticated` and redirects to /login,
+  // which is what the user would otherwise have to do by hand.
+  useEffect(() => onSessionExpired(logout), [logout])
 
   return (
     <AuthContext.Provider
