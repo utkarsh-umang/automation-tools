@@ -13,6 +13,7 @@ import math
 import re
 from datetime import datetime, timedelta
 
+from app.core.youtube_countries import is_allowed_country, normalize_country_code
 from app.schemas.youtube.lead import EmailStatus
 from app.worker.youtube.channels import get_recent_videos, get_video_stats
 from app.worker.youtube.credits import CreditLimitExceeded
@@ -48,8 +49,17 @@ def evaluate_channel(
         if subs < filters.get("minSubs", 0) or subs > filters.get("maxSubs", 10_000_000):
             return None
 
-        country = channel.get("snippet", {}).get("country", "")
-        exclude_countries = filters.get("excludeCountries", ["IN"])
+        country_raw = channel.get("snippet", {}).get("country")
+        if not is_allowed_country(country_raw):
+            # Strict allowlist: missing, empty, malformed, or unlisted
+            # country values are all rejected by default. See
+            # app/core/youtube_countries.py and docs/youtube-country-filter-rca.md.
+            return None
+        country = normalize_country_code(country_raw) or ""
+
+        exclude_countries = {
+            normalize_country_code(c) for c in filters.get("excludeCountries", ["IN"])
+        }
         if country in exclude_countries:
             return None
 

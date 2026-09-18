@@ -78,6 +78,7 @@ ignore = ["E501", "N802", "N815"]
 "scripts/verify_thumbnail_job_details_mongo.py" = ["E402"]
 # Same reason: repo root goes on sys.path before the ``app`` package is importable.
 "scripts/repair_octet_stream_references.py" = ["E402"]
+"scripts/audit_youtube_lead_countries.py" = ["E402"]
 
 [build-system]
 requires = ["poetry-core"]
